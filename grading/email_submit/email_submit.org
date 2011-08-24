@@ -170,7 +170,7 @@ But if you don't know, you should probably just use the same SMTP
 settings that your email client uses.  Look there for whether your
 SMTP server requires SSL, what its hostname is, and what port you
 should connect to it on.  Then send me an email, because I probably
-have to change the program to accomodate this setup.  (I only tested
+have to change the program to accommodate this setup.  (I only tested
 it with a local SMTP server. How's that for assurance?)
 
 * Using the program

@@ -190,6 +190,10 @@ def save_attachments(m):
     basename = get_base_filename(m)
     found_attachments = []
 
+    # TODO: is the Content-Disposition header reliable enough??
+    # some mailers (MH-E...) don't seem to include it.
+    # perhaps we should look for attachments OR message parts of the preferred types?
+
     for part in m.walk():
         disp = part['Content-Disposition']
         if disp and disp[0:10].lower() == 'attachment':
@@ -403,4 +407,4 @@ if __name__ == '__main__':
 # 1. Check that attachment doesn't already exist in submit dir. If it does, overwrite? (option)
 # 2. Move or rename files when feedback has been sent.
 # 3. Interface to create feedback files (for people who can't or don't want to modify original attachments)
-# 5. docs
+# 4. Is Content-Disposition header reliable enough?
