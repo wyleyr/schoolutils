@@ -43,20 +43,21 @@
      - keep track of grades, calculate grades, etc.
 
 ** Who is it for?
-   email_submit.py will be great for you if:
-     - you receive student assignments via email
-     - you grade them electronically, by modifying the assignment
-       files themselves
-     - you're not afraid of typing commands into your computer to save
-       yourself manual labor
+email_submit.py will be great for you if:
+   - you receive student assignments via email
+   - you grade them electronically, by modifying the assignment
+     files themselves
+   - you're not afraid of typing commands into your computer to save
+     yourself manual labor
 
-   email_submit.py /might/ work for you if:
-     - you receive student assignments via email, but want to print
-       hard copies for grading
-     - you receive hard copies of student assignments, but want to
-       send feedback or grades via email
-     - you want to do something more complicated, but know how to
-       program in Python
+\noindent
+email_submit.py /might/ work for you if:
+   - you receive student assignments via email, but want to print
+     hard copies for grading
+   - you receive hard copies of student assignments, but want to
+     send feedback or grades via email
+   - you want to do something more complicated, but know how to
+     program in Python
 
 * Installation
 ** Prerequisites
@@ -76,9 +77,9 @@
       of another program.
 
 ** Installation proper
-   email_submit.py is a single-file Python program with several
-   interfaces; to install it, you just need set up each of its
-   interfaces as an executable file.
+email_submit.py is a single-file Python program with several
+interfaces; to install it, you just need set up each of its interfaces
+as an executable file.
 
    1) Put the email_submit.py file somewhere on your PATH.
    2) Make the email_submit.py file executable.
@@ -87,15 +88,16 @@
       - split-attachments
       - send-feedback
 
-   So, for example, assuming =~/bin= is on your PATH:
-   #+BEGIN_EXAMPLE
-   $ mv email_submit.py ~/bin
-   $ cd ~/bin
-   $ chmod +x email_submit.py
-   $ ln -s email_submit.py get-submissions
-   $ ln -s email_submit.py split-attachments
-   $ ln -s email_submit.py send-feedback
-   #+END_EXAMPLE
+\noindent
+So, for example, assuming =~/bin= is on your PATH:
+#+BEGIN_EXAMPLE
+$ mv email_submit.py ~/bin
+$ cd ~/bin
+$ chmod +x email_submit.py
+$ ln -s email_submit.py get-submissions
+$ ln -s email_submit.py split-attachments
+$ ln -s email_submit.py send-feedback
+#+END_EXAMPLE
 
 * Configuration
 
@@ -113,13 +115,13 @@ do this:
      address for assignment submissions, if you don't want a
      complicated filtering setup.) That way, downloading assignment
      submissions doesn't affect when or how your other email is
-     downloaded.
+     downloaded.[fn:3]
   2) You may want to use multiple destinations and/or keep your
      messages on the server. email_submit.py /throws away/ all parts of
      a message that aren't attachments, so if your students send you
      important information that's not in the attachments, you'll need
      another way to read it.
-  3) You should set up the split-attachments interface as an MDA_external
+  3) You should set up the split-attachments interface as an =MDA_external=
      destination.  *Note*: It's important that you set =ignore_stderr = True=
      for this destination.[fn:2]
 
@@ -135,13 +137,16 @@ port = 995
 [destination]
 type = MDA_external
 path = /home/user/bin/split-attachments
-ignore_stderr = True # important!!
+# important!!
+ignore_stderr = True
 
 [options]
 verbose = 2
 read_all = False
-delete = False # leave messages on server
-delete_after = 7 # delete them after 7 days
+# leave messages on server
+delete = False
+# delete them after 7 days
+delete_after = 7
 #+END_EXAMPLE
 
 ** Configuring email_submit.py
@@ -151,7 +156,7 @@ email_submit.py is done via global variables (marked in =ALL_CAPS= under
 
 I will eventually give more helpful descriptions of the options here,
 but for now, the advice is: read the code, change obvious filler
-values (e.g., 'Your name' should become, say, 'Immanuel Kant'),
+values (e.g., =Your Name= should become, say, =Immanuel Kant=),
 leaving quotes, commas and parentheses as they are; and leave the
 other values as their defaults.
 
@@ -177,7 +182,7 @@ file.
 The one important concept across all the interfaces is that of the
 /submit directory/.  This is where attachments will be saved by the
 =get-submissions= interface when they are downloaded, and where the
-=send-feedback= program looks for files to send back to students.
+=send-feedback= interface looks for files to send back to students.
 
 You can set the submit directory on the command line using the =-d=
 option (or by setting the EMAIL_SUBMIT_DIRECTORY environment
@@ -192,20 +197,34 @@ directory should be assignment files submitted by students (or other
 files that you'll want to email back to them).  Don't mix files you
 want to send back with files you don't want to send.
 
-** get-submissions
+** The =get-submissions= interface
 This interface just tells your mail fetching program to download new
 mail.  If you configured your mail fetching program correctly, it
 should feed new messages into the =split-attachments= interface
 (behind the scenes), resulting in all your students' assignment files
 ending up in the submit directory.
 
-So, for example,
+So, for example, this command should download all your students'
+papers to the directory `paper1':
 #+BEGIN_EXAMPLE
 $ get-submissions -d paper1
 #+END_EXAMPLE
-should download all your students' papers to the directory `paper1'.  
+\noindent
+Alternatively, you could issue the =get-submissions= command from
+within the `paper1' directory without any options:
+#+BEGIN_EXAMPLE
+$ cd paper1
+$ get-submissions
+#+END_EXAMPLE
+You'll notice that the files, once downloaded to the submit directory,
+will all be named using a =<email-address>::<original-file-name>=
+format, e.g., `student@wherever.edu::paper1.doc'.  This naming
+convention accomplishes two things: first, it associates the file with
+the email address of the student who submitted it; and second, it
+makes it unlikely that two submissions for the same assignment will
+have the same file name.
 
-** send-feedback
+** The =send-feedback= interface
 Once you've downloaded your students' files, you can get to work on
 grading them.  Just open each file, leave your comments and grade in
 the file, then save it again.
@@ -226,16 +245,33 @@ to send feedback files, even if your students send you unmodifiable
 files (like PDFs).  Just put your comments in a file like
 `student@wherever.edu::paper-feedback.txt'.
 
-So, for example,
+So, for example, this command should email each of the files in the
+`paper1' directory back to students:
 #+BEGIN_EXAMPLE
 $ send-feedback -d paper1
 #+END_EXAMPLE
-should email each of the files in the `paper1' directory back to students.
 
-** split-attachments
+
+** The =split-attachments= interface
 You probably will never need to use this interface interactively, but
 it could occasionally be useful for tasks like getting all the
 attachments out of a directory of old email messages.  Be creative!
+
+** Logging
+Whenever you use one of email_submit.py's interfaces, the actions that
+it takes will be logged.  This is useful for determining what went
+wrong if the program fails to work as expected.
+
+The path of the log file is determined by the =log_file= key of the
+=OPTIONS= configuration variable, or by the =-l= command line switch.
+(The command line switch, if given, takes precedence; but I recommend
+setting an absolute path for the log file in the =OPTIONS= variable.)
+
+You can also determine how much information you want to log in the log
+file via the =log_level= key of the =OPTIONS= variable.  The possible
+values are =logging.DEBUG= (most information), =logging.INFO=,
+=logging.WARNING=, =logging.ERROR=, and =logging.CRITICAL= (least
+information).
 
 * Footnotes
 
@@ -248,3 +284,9 @@ attachments out of a directory of old email messages.  Be creative!
 [fn:2] email_submit.py will always exit with a non-zero status if it
       fails to save an attachment from a message; but it may write to
       sys.stderr even for errors that it handles just fine.
+
+[fn:3] If you sign up for a free email account to use as a submission
+      address, be aware that there are some problems accessing GMail
+      accounts via POP; see [[http://pyropus.ca/software/getmail/faq.html#faq-notabug-gmail-bug][this answer]] in the getmail FAQ.  If you
+      use a GMail submission address, I recommend setting up getmail
+      to download your mail via IMAP instead.
