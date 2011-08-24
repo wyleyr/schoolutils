@@ -379,7 +379,7 @@ if __name__ == '__main__':
         OPTIONS['log_file'] = cmd_opts.log_file
 
     # set up logging
-    logging.basicConfig(filename=OPTIONS['log_name'], level=OPTIONS['log_level'])
+    logging.basicConfig(filename=OPTIONS['log_file'], level=OPTIONS['log_level'])
 
     # dispatch on program name to determine which interface to run
     prog_name = os.path.basename(sys.argv[0])
