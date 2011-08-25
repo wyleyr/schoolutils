@@ -96,7 +96,14 @@ SMTP_CONNECTION_CLASS = smtplib.SMTP
 # For smtplib.SMTP, these are: host, port, local_hostname, timeout
 # For smtplib.SMTP_SSL, they are: host, port, local_hostname, keyfile, certfile, timeout
 # See the smtplib documentation.
-SMTP_ARGS = ('localhost',) 
+SMTP_ARGS = ('localhost',)
+
+# does the server require a login?
+SMTP_REQUIRES_LOGIN = False
+
+# login credentials (only used if SMTP_REQUIRES_LOGIN is True)
+SMTP_USERNAME = ''
+SMTP_PASSWORD = ''
 
 #####
 # 'inbound' functions: for saving attachments
@@ -285,7 +292,14 @@ def send_message(m):
 
     # NOTE: we make a per-message connection because some servers (notably Exim4) seem to
     # dislike sending multiple messages via smtplib on the same connection
-    smtp = SMTP_CONNECTION_CLASS(*SMTP_ARGS)
+    if isinstance(SMTP_ARGS, dict):
+        smtp = SMTP_CONNECTION_CLASS(**SMTP_ARGS)
+    else:
+        smtp = SMTP_CONNECTION_CLASS(*SMTP_ARGS)
+        
+    if SMTP_REQUIRES_LOGIN:
+        smtp.login(SMTP_USERNAME, SMTP_PASSWORD)
+
     try:
         logging.info("Sending feedback message to %s" % to_addr) 
         result =  smtp.sendmail(from_addr, to_addr, m.as_string())
