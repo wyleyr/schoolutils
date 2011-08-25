@@ -75,6 +75,7 @@ OPTIONS = {
     'submit_directory': os.getcwd(), # may be overriden by command line option
     'log_file': 'email_submit.log', # may be overriden by command line option
     'log_level': logging.INFO,
+    'overwrite_existing': False, # if False, always saves attachments under a unique name
 }
 
 # feedback message template
@@ -133,18 +134,36 @@ def get_mod_original_filename(m):
     "Return the original filename of an attachment part, replacing ' ' and '::' with '-'"
     orig = m.get_filename()
     if not orig:
-        raise SubmissionError("Part did not have associated filename")
+        # some submissions may not come as an attachment part with a filename
+        orig = 'unnamed-msg-part'
 
     # replacing spaces makes for tidier shell interactions; replacing
     # '::' ensures we can later split a filename at '::' and get the
     # original email and the filename as parts
     return orig.replace(' ', '-').replace('::', '-')
 
-def get_filename(basename, m):
+def get_filename(prefix, m):
     "Return the complete path and filename to save an attachment under"
-    # TODO: allow per-message determination of save directory?
-    return os.path.join(determine_submit_directory(),
-                        basename + '::' + get_mod_original_filename(m))
+    orig = get_mod_original_filename(m)
+    d = determine_submit_directory()
+    candidate = os.path.join(d, prefix + '::' + orig)
+
+    # generate a unique filename if the user doesn't want files to be overwritten
+    # preserve extension for platforms that rely on it
+    if not OPTIONS['overwrite_existing']:
+        # these ugly machinations are necessary because os.path.splitext gets 
+        # confused by the '.'s in the email address portion of the filename
+        orig_base, sep, ext = orig.rpartition('.')
+        if not sep: # orig_base is empty and ext == orig
+            orig_base, sep, ext = orig, '', ''
+
+        base = d + prefix + '::' + orig_base
+        i = 1
+        while os.path.exists(candidate):
+            candidate = base + '-dup' + str(i) + sep + ext
+            i += 1
+
+    return candidate
 
 def write_payload(fname, part):
     "Write part to file named by fname, decoding payload if necessary"
@@ -417,7 +436,6 @@ if __name__ == '__main__':
         logging.shutdown()
 
 # TODO LIST
-# 1. Check that attachment doesn't already exist in submit dir. If it does, overwrite? (option)
 # 2. Move or rename files when feedback has been sent.
 # 3. Interface to create feedback files (for people who can't or don't want to modify original attachments)
-# 4. Is Content-Disposition header reliable enough?
+
