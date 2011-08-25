@@ -197,13 +197,12 @@ def save_attachments(m):
     basename = get_base_filename(m)
     found_attachments = []
 
-    # TODO: is the Content-Disposition header reliable enough??
-    # some mailers (MH-E...) don't seem to include it.
-    # perhaps we should look for attachments OR message parts of the preferred types?
-
+    # some mailers may not include a Content-Disposition: attachment... header,
+    # so we also consider non-attachment parts that are of preferred content types
     for part in m.walk():
         disp = part['Content-Disposition']
-        if disp and disp[0:10].lower() == 'attachment':
+        if (disp and disp[0:10].lower() == 'attachment') or \
+           part.get_content_type() in PREFER_CONTENT_TYPES:
             found_attachments.append(part)
 
     good_attachments = filter(lambda p: p.get_content_type() not in EXCLUDE_CONTENT_TYPES,
@@ -223,7 +222,7 @@ def save_attachments(m):
     else:
         # more than one unexcluded attachment; make a (feeble) effort
         # to determine which is the real assignment, otherwise save all attachments
-        prefs = filter(lambda p: p.get_content_type() in PREFERRED_CONTENT_TYPES,
+        prefs = filter(lambda p: p.get_content_type() in PREFER_CONTENT_TYPES,
                        good_attachments)
         if len(prefs) == 1:
             att = prefs[0]
