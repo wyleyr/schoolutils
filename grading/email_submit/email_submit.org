@@ -81,7 +81,7 @@ email_submit.py is a single-file Python program with several
 interfaces; to install it, you just need set up each of its interfaces
 as an executable file.
 
-   1) Put the email_submit.py file somewhere on your PATH.
+   1) Put the email_submit.py file somewhere on your PATH.[fn:4]
    2) Make the email_submit.py file executable.
    3) Create links somewhere on your PATH to email_submit.py, with the names:
       - get-submissions
@@ -290,3 +290,11 @@ information).
       accounts via POP; see [[http://pyropus.ca/software/getmail/faq.html#faq-notabug-gmail-bug][this answer]] in the getmail FAQ.  If you
       use a GMail submission address, I recommend setting up getmail
       to download your mail via IMAP instead.
+
+[fn:4] Your PATH is a list of directories that your shell (the program
+      you type commands in) will search for the programs whose names
+      you type on the command line.  You can see your PATH by typing
+      =echo $PATH= at the command line.  To add a directory to your
+      PATH, edit your shell's startup file.  For example, to add
+      =~/bin= to your PATH in the Bash shell, put a line like
+      =export PATH=~/bin:$PATH= in the file =~/.bash_profile=.
