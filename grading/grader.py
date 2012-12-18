@@ -1,40 +1,10 @@
 """
 grader.py
 
-Enter students' grades individually on a command line, then calculate
-weighted averages and write to CSV.
+Utilities for calculating grades
 """
-# The beginning of a Python program usually involves importing modules
-# from the standard library.  Here I import the csv module so I can
-# write a csv file, below, and a couple of modules nearly every Python
-# program imports: os and sys.
 import csv, os, sys, math
 
-# A couple of global variables needed by the functions below; you
-# should customize these for the particular class you're grading.
-INPUT_FIELDS = ["Name", "Paper 1 grade", "Paper 2 grade"]
-CALCULATED_FIELDS = ["Final percentage", "Final letter grade"]
-
-# You probably don't need to change this function:        
-def main():
-    "The program's entry point, when run interactively."
-
-    print "AUSTIN'S GREAT GRADING PROGRAM!"
-    print "Enter each student's name and grade."
-    print "To stop entry, leave the name field blank.\n"
-
-    all_grades = []
-    while True:
-        student_grade_or_stop = get_next_student_grades()
-        if student_grade_or_stop:
-            all_grades.push(student_grade_or_stop)
-        else:
-            break
-
-    write_csv(INPUT_FIELDS + CALCULATED_FIELDS, all_grades)
-
-    exit(0) 
-    
 def main_with_csv(in_name, out_name, sort_field=''):
     "Main entry point, when run against a CSV file"
     fieldnames, rows = read_csv(in_name)
@@ -60,32 +30,6 @@ def main_with_csv(in_name, out_name, sort_field=''):
     # output to CSV:
     write_csv(out_name, fieldnames + calculated_fields, rows)
             
-# You'll need to modify this function to suit your needs:
-def get_next_student_grades():
-    """Ask the user for each of a student's assignment grades, then
-    calculate their final percentage and letter grade"""
-    
-    student_grades = {}
-    for f in INPUT_FIELDS:
-        # ask the user for the value to put in each field
-        i = raw_input("Enter %s: " % f)
-        if not i and f == "Name":
-            # stop when a name field is left blank
-            return False
-        else:
-            # no attempt made here to convert input strings to numbers
-            # or other types of value; you'll have to do that at some
-            # point!  (Hint: you'll probably need the float()
-            # function.)
-            student_grades[f] = i
-
-    for f in CALCULATED_FIELDS:
-        student_grades[f] = calculate_grade(f, student_grades)
-
-    return student_grades
-
-# The functions below all deal with calculating grades.  You need to
-# fill in the implementation here.
 def calculate_grade_spring2012(f, sgs):
     raise NotImplementedError("Implementation of calculate_grade_spring2012 is gone")
 
@@ -99,9 +43,7 @@ def calculate_grade_fall2012(f, sgs):
     elif f == "Final grade":
         return points_to_letter(sgs["Grade average"])
     else:
-        raise NotImplementedError(
-            "Man, I haven't even *heard* of a '%s' grade. " % f +\
-            "Don't even try that shit with me.") 
+        raise NotImplementedError("Unknown grade type: %s" % f)
 
 # update this every semester
 calculate_grade = calculate_grade_fall2012
@@ -149,15 +91,6 @@ def points_to_letter(pts):
     else:
         raise ValueError("Value not on 4-point scale: %s" % pts) 
     
-
-def final_percentage(sgs):
-    "Calculate a final percentage based on a student's grades"
-    raise NotImplementedError()
-
-def final_letter_grade(sgs):
-    "Calculate a final letter grade based on a student's grades"
-    raise NotImplementedError()
-
 def homework_avg(sgs):
     # mean of homework 1-9 scores, except the lowest is dropped
     hw_fields = [k for k in sgs.keys() if k[0:2] == 'EX']
@@ -207,9 +140,6 @@ def overall_avg(sgs):
     return avg
         
 
-# These functions are utility functions that you'll probably want to
-# use in defining final_percentage, final_letter_grade, etc.  You need
-# to provide the implementations.
 def extract_and_zero_grades(fields, d):
     "Extract an array of grades from a dictionary; convert non-numeric values to 0.0"
     # convert strings to floats; non-numeric values get a zero
@@ -236,9 +166,6 @@ def letter_grade_to_percentage(lg):
     "Convert a letter grade to a percentage"
     raise NotImplementedError()
 
-# This function will output the final list of student grades to a CSV
-# file, so that you can look at the results in a text editor or in a
-# spreadsheet.  I've provided the implementation here.
 def write_csv(fname, fields, all_sgs):
     "Write a list of dictionaries representing student grades to rows in a CSV file"
     # don't try to write an empty list of grades:
