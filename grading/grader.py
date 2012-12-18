@@ -5,6 +5,9 @@ Utilities for calculating grades
 """
 import csv, os, sys, math
 
+#
+# Interfaces
+#
 def main_with_csv(in_name, out_name, sort_field=''):
     "Main entry point, when run against a CSV file"
     fieldnames, rows = read_csv(in_name)
@@ -30,6 +33,9 @@ def main_with_csv(in_name, out_name, sort_field=''):
     # output to CSV:
     write_csv(out_name, fieldnames + calculated_fields, rows)
             
+#
+# Grade calculation functions for specific courses
+#
 def calculate_grade_spring2012(f, sgs):
     raise NotImplementedError("Implementation of calculate_grade_spring2012 is gone")
 
@@ -48,10 +54,12 @@ def calculate_grade_fall2012(f, sgs):
 # update this every semester
 calculate_grade = calculate_grade_fall2012
 
-# represents ranges for grades on a GPA scale
-# format: (letter grade, point_value, exclusive_max, inclusive_min)
-# values less than -1.0 or greater than 5.0 are assumed not to be on this scale    
+#
+# Utility functions for grade calculations
+#
 POINTS = [
+    # format: (letter grade, point_value, exclusive_max, inclusive_min)
+    # TODO: add support for percentages?
     ('A+', 4.2, 5.0, 4.0), 
     ('A', 4.0, 4.2, 3.85),
     ('A-', 3.7, 3.85, 3.5),
@@ -69,6 +77,7 @@ POINTS = [
     ('I', float("Nan"), float("-inf"), float("inf"))
 ]
 
+# Grade type conversions:
 def letter_to_points(lgrd):
     "Convert a letter grade to 4.0-scale points"
     points_dict = dict([(p[0], p[1]) for p in POINTS])
@@ -90,7 +99,31 @@ def points_to_letter(pts):
             return grade
     else:
         raise ValueError("Value not on 4-point scale: %s" % pts) 
-    
+ 
+def percentage_to_letter(p):
+    "Convert a percentage to a letter grade"
+    raise NotImplementedError()
+
+def letter_to_percentage(lg):
+    "Convert a letter grade to a percentage"
+    raise NotImplementedError()
+        
+def extract_and_zero_grades(fields, d):
+    "Extract an array of grades from a dictionary; convert non-numeric values to 0.0"
+    # convert strings to floats; non-numeric values get a zero
+    grades = []
+    for f in fields:
+        try:
+            g = float(d[f])
+        except ValueError:
+            #print "converting to zero: %s" % d[f]
+            g = 0.0
+        grades.append(g)
+
+    return grades
+
+# Aggregations and averages:   
+# (needs significant generalization/refactoring)
 def homework_avg(sgs):
     # mean of homework 1-9 scores, except the lowest is dropped
     hw_fields = [k for k in sgs.keys() if k[0:2] == 'EX']
@@ -138,34 +171,12 @@ def overall_avg(sgs):
     
     avg = 0.40 * final + 0.20 * midterm + 0.25 * homework + 0.15 * quiz
     return avg
-        
-
-def extract_and_zero_grades(fields, d):
-    "Extract an array of grades from a dictionary; convert non-numeric values to 0.0"
-    # convert strings to floats; non-numeric values get a zero
-    grades = []
-    for f in fields:
-        try:
-            g = float(d[f])
-        except ValueError:
-            #print "converting to zero: %s" % d[f]
-            g = 0.0
-        grades.append(g)
-
-    return grades
                       
 def weighted_average(nums, weights):
     "Calculate a weighted average"
     raise NotImplementedError()
 
-def percentage_to_letter_grade(p):
-    "Convert a percentage to a letter grade"
-    raise NotImplementedError()
-
-def letter_grade_to_percentage(lg):
-    "Convert a letter grade to a percentage"
-    raise NotImplementedError()
-
+# I/O:
 def write_csv(fname, fields, all_sgs):
     "Write a list of dictionaries representing student grades to rows in a CSV file"
     # don't try to write an empty list of grades:
