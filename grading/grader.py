@@ -44,7 +44,7 @@ def calculate_grade_summer2012(sgs):
 def calculate_grade_fall2012(sgs):
     entered_grades = ["Paper 1", "Paper 2", "Paper 3", "Exam grade"]
 
-    gavg = letter_grade_avg(sgs, entered_grades)
+    gavg = letter_grade_average(sgs, entered_grades)
     sgs["Grade average"] = gavg
     sgs["Final grade"] = points_to_letter(gavg)
 
@@ -151,58 +151,29 @@ def extract_and_zero_grades(fields, d):
     return grades
 
 # Aggregations and averages:   
-# (needs significant generalization/refactoring)
-def homework_avg(sgs):
-    # mean of homework 1-9 scores, except the lowest is dropped
-    hw_fields = [k for k in sgs.keys() if k[0:2] == 'EX']
-    hw_fields.sort()
-
-    # convert strings to floats; non-numeric values get a zero
-    grades = extract_and_zero_grades(hw_fields, sgs)
-
-    # drop the lowest score:
-    grades.sort()
-    grades = grades[1:]
-
-    return sum(grades) / len(grades)
-
-def quiz_avg(sgs):
-    # mean of quizzes 1 through 3, times 10
-    quiz_fields = [k for k in sgs.keys() if k[0:4] == 'Quiz' and len(k) < 12]
-
-    grades = extract_and_zero_grades(quiz_fields, sgs)
-
-    # drop the lowest score:
-    grades.sort()
-    grades = grades[1:]
-
-    # multiply the average by 10, since quizzes were out of 10:
-    return 10.0 * sum(grades) / len(grades)
-
-def letter_grade_avg(sgs, fieldnames):
-    "4.0-scale average (unweighted) of letter grades found in fieldnames"
+def letter_grade_average(sgs, fieldnames, weights=None):
+    """4.0-scale average of the letter grades found in sgs.
+       If given, weights[i] should be a weight for the letter grade in
+       sgs[fieldnames[i]].
+    """
     lgrades = [sgs[field] for field in fieldnames]
     pgrades = map(letter_to_points, lgrades)
+
+    if weights:
+        return weighted_average(pgrades, weights)
+    else:
+        return unweighted_average(pgrades)
     
-    return sum(pgrades) / len(pgrades)
-    
-def overall_avg(sgs):
-    # final percentage is:
-    # 40% final exam
-    # 20% midterm exam
-    # 25% homework average
-    # 15% quiz average
-    final, midterm = extract_and_zero_grades(
-        ['Final Exam [100]', 'Midterm Exam [100]'], sgs)
-    homework = sgs['Homework average'] # error if not calculated yet!
-    quiz = sgs['Quiz average'] # error if not calculated yet!
-    
-    avg = 0.40 * final + 0.20 * midterm + 0.25 * homework + 0.15 * quiz
-    return avg
-                      
-def weighted_average(nums, weights):
-    "Calculate a weighted average"
-    raise NotImplementedError()
+def unweighted_average(grades):
+    "Calculate an unweighted average"
+    return float(sum(grades)) / len(grades)
+
+def weighted_average(grades, weights):
+    """Calculate a weighted average.
+    weights[i] should be the weight given to the grade in grades[i].
+    This function does not check that weights sum to 1.
+    """
+    return sum([n[0] * n[1] for n in zip(grades, weights)])
 
 # I/O:
 def write_csv(fname, fields, all_sgs):
