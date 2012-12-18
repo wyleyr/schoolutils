@@ -58,8 +58,7 @@ calculate_grade = calculate_grade_fall2012
 #
 POINTS = [
     # format: (letter grade, point_value, exclusive_max, inclusive_min)
-    # TODO: add support for percentages?
-    ('A+', 4.2, 5.0, 4.0), 
+    ('A+', 4.2, 5.0, 4.2), 
     ('A', 4.0, 4.2, 3.85),
     ('A-', 3.7, 3.85, 3.5),
     ('B+', 3.3, 3.5, 3.15),
@@ -76,37 +75,67 @@ POINTS = [
     ('I', float("Nan"), float("-inf"), float("inf"))
 ]
 
+PERCENTS = [
+    # format: (letter grade, point_value, exclusive_max, inclusive_min)
+    ('A+', 100, 200, 97), 
+    ('A', 95, 97, 94),
+    ('A-', 92, 94, 90),
+    ('B+', 88, 90, 87),
+    ('B', 85, 87, 84),
+    ('B-', 82, 84, 80),
+    ('C+', 78, 80, 77),
+    ('C', 75, 77, 74),
+    ('C-', 72, 74, 70),
+    ('D+', 68, 70, 67),
+    ('D', 65, 67, 64),
+    ('D-', 62, 64, 60),
+    ('F', 58, 60, 0),
+    # dummy limits ensure nothing falls in this range:
+    ('I', float("Nan"), float("-inf"), float("inf"))
+]
+
 # Grade type conversions:
-def letter_to_points(lgrd):
-    "Convert a letter grade to 4.0-scale points"
-    points_dict = dict([(p[0], p[1]) for p in POINTS])
-    try:
-        return points_dict[lgrd]
-    except KeyError:
-        # assume something went missing
-        return float('Nan')
-    
-def points_to_letter(pts):
+def letter_to_points(letter_grade):
+    "Convert a letter grade to 4.0-scale grade"
+    return letter_to_number(letter_grade, POINTS)
+
+def letter_to_percentage(letter_grade):
+    "Convert a letter grade to a percentage"
+    return letter_to_number(letter_grade, PERCENTS)
+
+def points_to_letter(p):
     "Convert a 4.0-scale grade to a letter grade"
+    return number_to_letter(p, POINTS)
+
+def percentage_to_letter(p):
+    "Convert a percentage to a letter grade"
+    return number_to_letter(p, PERCENTS)
+
+def letter_to_number(letter_grade, scale):
+    """Convert a letter grade to a number using a given scale.
+       Returns float('Nan') for grades not in the scale."""
+    for grade, val, mx, mn in scale:
+        if letter_grade == grade:
+            return val
+    else:
+        return float('Nan')
+
+def number_to_letter(n, scale):
+    """Convert a number grade n to a letter using a given scale.
+       Returns 'I' for float('Nan') grades"""
     # any missing grades should default to Incomplete:
-    if math.isnan(pts):
+    if math.isnan(n):
         return 'I'
 
     # otherwise find the appropriate grade given ranges in the scale:
-    for grade, val, mx, mn in POINTS:
-        if mn <= pts < mx:
+    for grade, val, mx, mn in scale:
+        if mn <= n < mx:
             return grade
     else:
-        raise ValueError("Value not on 4-point scale: %s" % pts) 
- 
-def percentage_to_letter(p):
-    "Convert a percentage to a letter grade"
-    raise NotImplementedError()
-
-def letter_to_percentage(lg):
-    "Convert a letter grade to a percentage"
-    raise NotImplementedError()
-        
+        raise ValueError("Value %s not on scale with max=%s and min=%s" %
+                         (n, scale[0][2], scale[-2][3])) 
+     
+       
 def extract_and_zero_grades(fields, d):
     "Extract an array of grades from a dictionary; convert non-numeric values to 0.0"
     # convert strings to floats; non-numeric values get a zero
