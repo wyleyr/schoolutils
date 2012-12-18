@@ -12,12 +12,8 @@ def main_with_csv(in_name, out_name, sort_field=''):
     "Main entry point, when run against a CSV file"
     fieldnames, rows = read_csv(in_name)
 
-    calculated_fields = ['Grade average', 'Final grade']
+    calculated_rows = [calculate_grade(row) for row in rows]
     
-    for row in rows:
-        for field in calculated_fields:
-            row[field] = calculate_grade(field, row)
-
     # sort rows before output based on sort_field if requested:
     def cmp_overall(x,y):
         if x[sort_field] < y[sort_field] or math.isnan(x[sort_field]):
@@ -28,28 +24,31 @@ def main_with_csv(in_name, out_name, sort_field=''):
             return 0
         
     if sort_field:
-        rows.sort(cmp=cmp_overall)
+        calculated_rows.sort(cmp=cmp_overall)
 
-    # output to CSV:
-    write_csv(out_name, fieldnames + calculated_fields, rows)
+    write_csv(out_name, calculated_rows[0].keys(), calculated_rows)
             
 #
 # Grade calculation functions for specific courses
 #
-def calculate_grade_spring2012(f, sgs):
+
+# Every grade calculation function consumes a dictionary containing
+# entered grades for one student and returns a dictionary containing
+# both the entered grades and the calculated grades.
+def calculate_grade_spring2012(sgs):
     raise NotImplementedError("Implementation of calculate_grade_spring2012 is gone")
 
-def calculate_grade_summer2012(f, sgs):
+def calculate_grade_summer2012(sgs):
     raise NotImplementedError("Implementation of calculate_grade_summer2012 is gone")
 
-def calculate_grade_fall2012(f, sgs):
-    "Calculate a fall 2012 (25A) grade on the basis of entered grades."
-    if f == "Grade average":
-        return letter_grade_avg(sgs, ["Paper 1", "Paper 2", "Paper 3", "Exam grade"])
-    elif f == "Final grade":
-        return points_to_letter(sgs["Grade average"])
-    else:
-        raise NotImplementedError("Unknown grade type: %s" % f)
+def calculate_grade_fall2012(sgs):
+    entered_grades = ["Paper 1", "Paper 2", "Paper 3", "Exam grade"]
+
+    gavg = letter_grade_avg(sgs, entered_grades)
+    sgs["Grade average"] = gavg
+    sgs["Final grade"] = points_to_letter(gavg)
+
+    return sgs
 
 # update this every semester
 calculate_grade = calculate_grade_fall2012
