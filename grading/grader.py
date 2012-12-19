@@ -1,14 +1,13 @@
 """
 grader.py
 
-Utilities for calculating grades
+Utilities for calculating and reporting grades
 """
 import csv, os, sys, math, optparse
 
 #
 # Top-level interfaces
 #
-
 # Each interface accepts an input file handle, an output file
 # handle, and an options structure
 def csv_to_csv(in_file, out_file, options):
@@ -26,7 +25,7 @@ def csv_to_csv(in_file, out_file, options):
 # Grade-list operations and reporting functions
 #
 def sort_grade_list(rows, sort_field):
-    "Sort a list of grades by sort_field"
+    "Sort a list of grade dicionaries by sort_field"
     def cmp_overall(x,y):
         if x[sort_field] < y[sort_field] or math.isnan(x[sort_field]):
             return 1 # puts highest score at the top
@@ -37,11 +36,10 @@ def sort_grade_list(rows, sort_field):
         
     rows.sort(cmp=cmp_overall)
     return rows
-   
+
 #
 # Grade calculation functions for specific courses
 #
-
 # Every grade calculation function consumes a dictionary containing
 # entered grades for one student and returns a dictionary containing
 # both the entered grades and the calculated grades.
@@ -145,7 +143,6 @@ def number_to_letter(n, scale):
         raise ValueError("Value %s not on scale with max=%s and min=%s" %
                          (n, scale[0][2], scale[-2][3])) 
      
-       
 def extract_and_zero_grades(fields, d):
     "Extract an array of grades from a dictionary; convert non-numeric values to 0.0"
     # convert strings to floats; non-numeric values get a zero
