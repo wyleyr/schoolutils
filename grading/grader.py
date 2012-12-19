@@ -130,7 +130,7 @@ def letter_to_number(letter_grade, scale):
 
 def number_to_letter(n, scale):
     """Convert a number grade n to a letter using a given scale.
-       Returns 'I' for float('Nan') grades"""
+       Returns 'I' for float('Nan') grades."""
     # any missing grades should default to Incomplete:
     if math.isnan(n):
         return 'I'
@@ -161,8 +161,7 @@ def extract_and_zero_grades(fields, d):
 def letter_grade_average(sgs, fieldnames, weights=None):
     """4.0-scale average of the letter grades found in sgs.
        If given, weights[i] should be a weight for the letter grade in
-       sgs[fieldnames[i]].
-    """
+       sgs[fieldnames[i]]."""
     lgrades = [sgs[field] for field in fieldnames]
     pgrades = map(letter_to_points, lgrades)
 
@@ -177,10 +176,9 @@ def unweighted_average(grades):
 
 def weighted_average(grades, weights):
     """Calculate a weighted average.
-    weights[i] should be the weight given to the grade in grades[i].
-    This function does not check that weights sum to 1 or normalize
-    the resulting grades.
-    """
+       weights[i] should be the weight given to the grade in grades[i].
+       This function does not check that weights sum to 1 or normalize
+       the resulting grades."""
     return sum([n[0] * n[1] for n in zip(grades, weights)])
 
 def points_to_weights(point_values):
