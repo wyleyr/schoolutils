@@ -183,6 +183,13 @@ def weighted_average(grades, weights):
     """
     return sum([n[0] * n[1] for n in zip(grades, weights)])
 
+def points_to_weights(point_values):
+    """Convert a list of point values to a list of fractional weights.
+       The return value at index i is the fraction that point_values[i]
+       represents of the sum of point_values."""
+    s = sum(point_values)
+    return [float(p)/s for p in point_values]
+
 #
 # I/O
 #
