@@ -3,18 +3,30 @@ grader.py
 
 Utilities for calculating grades
 """
-import csv, os, sys, math
+import csv, os, sys, math, optparse
 
 #
-# Interfaces
+# Top-level interfaces
 #
-def main_with_csv(in_name, out_name, sort_field=''):
-    "Main entry point, when run against a CSV file"
-    fieldnames, rows = read_csv(in_name)
+
+# Each interface accepts an input file handle, an output file
+# handle, and an options structure
+def csv_to_csv(in_file, out_file, options):
+    "Interface for reading and writing CSV files"        
+    fieldnames, rows = read_csv(in_file)
 
     calculated_rows = [calculate_grade(row) for row in rows]
     
-    # sort rows before output based on sort_field if requested:
+    if options.sort_field:
+        calculated_rows = sort_grade_list(calculated_rows, options.sort_field)
+        
+    write_csv(out_file, calculated_rows[0].keys(), calculated_rows)
+
+#
+# Grade-list operations and reporting functions
+#
+def sort_grade_list(rows, sort_field):
+    "Sort a list of grades by sort_field"
     def cmp_overall(x,y):
         if x[sort_field] < y[sort_field] or math.isnan(x[sort_field]):
             return 1 # puts highest score at the top
@@ -23,11 +35,9 @@ def main_with_csv(in_name, out_name, sort_field=''):
         else:
             return 0
         
-    if sort_field:
-        calculated_rows.sort(cmp=cmp_overall)
-
-    write_csv(out_name, calculated_rows[0].keys(), calculated_rows)
-            
+    rows.sort(cmp=cmp_overall)
+    return rows
+   
 #
 # Grade calculation functions for specific courses
 #
@@ -171,52 +181,73 @@ def unweighted_average(grades):
 def weighted_average(grades, weights):
     """Calculate a weighted average.
     weights[i] should be the weight given to the grade in grades[i].
-    This function does not check that weights sum to 1.
+    This function does not check that weights sum to 1 or normalize
+    the resulting grades.
     """
     return sum([n[0] * n[1] for n in zip(grades, weights)])
 
-# I/O:
-def write_csv(fname, fields, all_sgs):
-    "Write a list of dictionaries representing student grades to rows in a CSV file"
-    # don't try to write an empty list of grades:
+#
+# I/O
+#
+def write_csv(f, fields, all_sgs):
+    "Write a list of student grade dictionaries to rows in a CSV file"
+    # simple sanity check: don't try to write an empty list of grades
     if not all_sgs:
-        return "Grade table empty; skipping csv write."
+        sys.stderr.write("Grade table empty; skipping csv write.\n")
+        return all_sgs
 
-    if os.path.exists(fname):
-        sys.stderr.write("Warning! %s already exists; overwriting!\n" % fname)
+    writer = csv.DictWriter(f, fields)
 
+    # writeheader() became available in Python 2.7:
     try:
-        f = open(fname, 'w')
-        writer = csv.DictWriter(f, fields)
+        writer.writeheader()
+    except AttributeError:
+        writer.writerow(dict(zip(fields,fields)))
 
-        # writeheader() became available in Python 2.7:
-        try:
-            writer.writeheader()
-        except AttributeError:
-            writer.writerow(dict(zip(fields,fields)))
+    for row in all_sgs:
+        writer.writerow(row)
 
-        # the actual data:    
-        for row in all_sgs:
-            writer.writerow(row)
-    finally:
-        f.close()
+    return all_sgs
 
-    return "Success!"
-
-def read_csv(fname, *args, **kwargs):
+def read_csv(f, *args, **kwargs):
     "Read a list of student grades as dictionaries from a CSV file"
-    f = open(fname)
     reader = csv.DictReader(f, *args, **kwargs)
     rows = [row for row in reader]
-    f.close()
 
     return reader.fieldnames, rows
-    
-# This is just a (somewhat strange-looking) Python idiom. It tells the
-# interpreter to run the main() function when you type "python
-# grader.py" at the command line.
+
+#
+# Main function when used as a script from CLI
+#
+def main():
+    parser = optparse.OptionParser()
+    parser.add_option("-i", "--csv-in", dest="in_file",
+                      metavar="FILE",
+                      help="Input data as CSV from FILE")
+    parser.add_option("-o", "--csv-out", dest="out_file",
+                      metavar="FILE",
+                      help="Output data as CSV to FILE")
+    parser.add_option("-s", "--sort", dest="sort_field",
+                      metavar="FIELD_NAME",
+                      help="Sort data on FIELD_NAME before output")
+    options, args = parser.parse_args()
+
+    if options.in_file:
+        in_file = open(options.in_file, 'r')
+    else:
+        in_file = sys.stdin
+        
+    if options.out_file:
+        out_file = open(options.out_file, 'w')
+    else:
+        out_file = sys.stdout
+
+    try:
+        csv_to_csv(in_file, out_file, options)
+        exit(0)
+    finally:
+        in_file.close()
+        out_file.close()
+
 if __name__ == '__main__':
-   PREFIX = '/home/rwl/Documents/philosophy/teaching/25A/grades'
-   main_with_csv(PREFIX + '/fall2012_grades.csv',
-                 PREFIX + '/fall2012_grades_calculated.csv',
-                 sort_field='Grade average')
+    main()
