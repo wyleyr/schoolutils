@@ -338,8 +338,33 @@ def create_grade(db_connection, assignment_id=None, student_id=None, value=None,
     query = base_query % {'fields': fields, 'places': places}
     db_connection.execute(query, params)
 
-    return ensure_unique(db_connection.execute("SELECT last_insert_rowid()").fetchall())
-   
+    return last_insert_rowid(db_connection)
+
+def create_or_update_grade(db_connection, grade_id=None, assignment_id=None, student_id=None,
+                           value=None, timestamp=None):
+    """Create a new grade or update a record of an existing grade.
+       Returns the id of the created or updated row.
+       WARNING: This function uses SQLite's INSERT OR REPLACE
+       statement rather than an UPDATE statement.  If you pass
+       grade_id, it *will* erase data in an existing row of the grades
+       table; you must provide all values to replace the existing data. 
+    """
+    base_query = """
+    INSERT OR REPLACE INTO grades (%(fields)s) VALUES (%(places)s);
+    """
+    if not timestamp:
+        timestamp = datetime.datetime.now()
+        
+    fields, places, params = make_values_clause(
+        ['id', 'assignment_id', 'student_id', 'value', 'timestamp'],
+        [grade_id, assignment_id, student_id, value, timestamp])    
+    
+    query = base_query % {'fields': fields, 'places': places}
+    db_connection.execute(query, params)
+    
+    return last_insert_rowid(db_connection)
+
+    
 #
 # for interfacing with grading functions:
 # 
