@@ -283,6 +283,7 @@ def update_student(db_connection, student_id=None, last_name=None, first_name=No
     return student_id
 
 def create_or_update_student():
+    # Do I need this function?  Should the logic be in Python, or should I use INSERT OR REPLACE?
     raise NotImplementedError
 
 def create_course_member(db_connection, course_id=None, student_id=None):
@@ -382,6 +383,8 @@ class GradeDict(dict):
            (grade_id, student_id, course_id, assignment_id, assignment_name, grade_value)
            as e.g. produced by select_grades
         """
+        # a single, unique student_id is necessary so that we can
+        # correctly enter new grades into the db
         extra_student_ids = filter(lambda r: r[1] != rows[0][1], rows)
         if extra_student_ids:
             raise ValueError("student_id must be same in rows: %s" % rows)
@@ -404,7 +407,7 @@ class GradeDict(dict):
                                  rows)
         
         # internally, the grades are maintained as a dictionary
-        # mapping assignment names to a tuple of the values needed to
+        # mapping assignment names to a list of the values needed to
         # store these grades back in the database
         self._grades = dict([(r[4], list(r)) for r in rows])
 
@@ -444,6 +447,7 @@ class GradeDict(dict):
         """Update or insert grades into grade database.
            Returns a list of ids of the affected rows.
         """
+        # TODO: transaction management here?
         ids = []
         for grade_id, student_id, course_id, assignment_id, assignment_name, grade_val \
                 in self._grades.values():
@@ -543,7 +547,8 @@ def add_where_clause(base_query, constraints):
     return query
 
 def make_values_clause(fields, values):
-    "Construct strings of field names and query parameter places, and a tuple of parameters"
+    """Construct strings of field names and query parameter places, and
+       a tuple of parameters"""
     used_fields = []
     params = []
     places = []
