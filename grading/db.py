@@ -379,25 +379,25 @@ class GradeDict(dict):
     def __init__(self, rows):
         """Initialize with a set of database rows.
            Each row should be formatted like:
-           (student_id, course_id, assignment_id, assignment_name, grade_id, grade_value)
-           as e.g. produced by select_grades_for_student. 
+           (grade_id, student_id, course_id, assignment_id, assignment_name, grade_value)
+           as e.g. produced by select_grades
         """
-        extra_student_ids = filter(lambda r: r[0] != rows[0][0], rows)
+        extra_student_ids = filter(lambda r: r[1] != rows[0][1], rows)
         if extra_student_ids:
             raise ValueError("student_id must be same in rows: %s" % rows)
         else:
-            self.student_id = rows[0][0]
+            self.student_id = rows[0][1]
 
         # a single, unique course_id is necessary so that we can
         # correctly enter new assignments into the db  
-        extra_course_ids = filter(lambda r: r[1] != rows[0][1], rows)
+        extra_course_ids = filter(lambda r: r[2] != rows[0][2], rows)
         if extra_course_ids:
             raise ValueError("course_id must be same in rows: %s" % rows)
         else:
-            self.course_id = rows[0][1]
+            self.course_id = rows[0][2]
         
         # ensure assignment names are unique in rows
-        assignment_names = [row[3] for row in rows]
+        assignment_names = [row[4] for row in rows]
         for i in range(len(assignment_names)):
             if assignment_names[i] in assignment_names[i+1:]:
                 raise ValueError("Assignment names must be unique in rows: %s" %
@@ -406,27 +406,33 @@ class GradeDict(dict):
         # internally, the grades are maintained as a dictionary
         # mapping assignment names to a tuple of the values needed to
         # store these grades back in the database
-        self._grades = dict([(r[3], r) for r in rows])
+        self._grades = dict([(r[4], list(r)) for r in rows])
 
     def __getitem__(self, key):
-        return self._grades[key][4]
+        return self._grades[key][5]
 
     def __setitem__(self, key, val):
         if key in self._grades:
-            self._grades[key][4] = val
+            self._grades[key][5] = val
         else:
             # grade_id and assignment_id not available;
             # they must be supplied at save time
-            self._grades[key] = (None, None, self.student_id, key, val)
+            self._grades[key] = [None, self.student_id, self.course_id, None, key, val]
 
     def __iter__(self):
         return self.keys()
+
+    def __repr__(self):
+        return str(self)
+
+    def __str__(self):
+        return '{%s}' % ', '.join(["'%s': %s" % t for t in self.items()]) 
     
     def keys(self):
         return self._grades.keys()
 
     def values(self):
-        return [v[4] for v in self._grades.values()]
+        return [v[5] for v in self._grades.values()]
 
     def items(self):
         return list(self.iteritems())
@@ -435,40 +441,29 @@ class GradeDict(dict):
         return (t for t in zip(self.keys(), self.values()))
     
     def save(self, db_connection):
-        "Update or insert grades into grade database"
-        for grade_id, assignment_id, student_id, assignment_name, grade_val, course_id \
+        """Update or insert grades into grade database.
+           Returns a list of ids of the affected rows.
+        """
+        ids = []
+        for grade_id, student_id, course_id, assignment_id, assignment_name, grade_val \
                 in self._grades.values():
-            if assignment_id is None:
-                # 1) is there an assignment by this name?
-                query = """
-                SELECT assignments.id
-                FROM assignments, courses
-                ON assignments.course_id=courses.id
-                WHERE assignments.name=? AND courses.id=?;
-                """
-                params = (assignment_name, course_id)
-                ids = db_connection.execute(query, params)
-                if len(ids) == 1:
-                    assignment_id = ids[0][0]
-                elif len(ids) == 0:
-                    query = "INSERT INTO assignments (course_id, name) VALUES (?, ?)"
-                    params = (course_id, assignment_name)
-                    db_connection.exceute(query, params)
-                    # ...
-                else:
-                    raise ValueError("More than one assignment with name %s for course_id %s" %
-                                     assignment_name, course_id)
+            if not assignment_id:
+                try:
+                    assignment_id = ensure_unique(
+                        select_assignments(db_connection, course_id=course_id, name=assignment_name))
+                except NoRecordsFound:
+                    desc = "Assignment row generated automatically by GradeDict.save()"
+                    assignment_id = create_assignment(db_connection, course_id=course_id,
+                                                      name=assignment_name, description=desc)
+                # MultipleRecordsFound exception should propagate
 
-                
-            if grade_id is not None:
-                query = """
-                UPDATE grades SET value=?
-                WHERE id=?;
-                """
-                params = (grade_id, grade_val)
-            else:
-                pass
+            row_id = create_or_update_grade(db_connection, grade_id=grade_id, student_id=student_id,
+                                            assignment_id=assignment_id, value=grade_val)
+            ids.append(row_id)
 
+        return ids
+                             
+            
 #            
 # utilities
 #
