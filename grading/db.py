@@ -151,21 +151,22 @@ def create_course(db_connection, year=None, semester=None, name=None, number=Non
     query = base_query % {'fields': fields, 'places': places}
     db_connection.execute(query, params)
 
-    return ensure_unique(db_connection.execute("SELECT last_insert_rowid()").fetchall())
+    return last_insert_rowid(db_connection)
     
-def select_assignments(db_connection, course_id=None, year=None, semester=None):
+def select_assignments(db_connection, course_id=None, year=None, semester=None, name=None):
     """Return a result set of assignments.
        The rows in the result set have the format:
-       (course_id, assignment_id, assignment_name)
+       (assignment_id, course_id, assignment_name)
     """
     base_query = """
-    SELECT courses.id, assignments.id, assignments.name
+    SELECT assignments.id, courses.id, assignments.name
     FROM assignments, courses
     ON assignments.course_id=courses.id
     %(where)s
     """
-    constraints, params = make_conjunction_clause(['courses.year', 'courses.semester', 'courses.id'],
-                                                   [year, semester, course_id])
+    constraints, params = make_conjunction_clause(
+        ['courses.year', 'courses.semester', 'courses.id', 'assignments.name'],
+        [year, semester, course_id, name])
     query = add_where_clause(base_query, constraints)
     
     return db_connection.execute(query, params).fetchall()
@@ -184,7 +185,7 @@ def create_assignment(db_connection, course_id=None, name=None, description=None
     query = base_query % {'fields': fields, 'places': places}
     db_connection.execute(query, params)
 
-    return ensure_unique(db_connection.execute("SELECT last_insert_rowid()").fetchall())
+    return last_insert_rowid(db_connection)
   
 def select_students(db_connection, year=None, semester=None, course_id=None,
                     course_name=None, last_name=None, first_name=None, sid=None):
@@ -245,7 +246,7 @@ def create_student(db_connection, first_name=None, last_name=None, sid=None):
     query = base_query % {'fields': fields, 'places': places}
     db_connection.execute(query, params)
 
-    return ensure_unique(db_connection.execute("SELECT last_insert_rowid()").fetchall())
+    return last_insert_rowid(db_connection)
 
 def update_student(db_connection, student_id=None, last_name=None, first_name=None, sid=None):
     """Update a record of an existing student.
@@ -297,16 +298,16 @@ def create_course_member(db_connection, course_id=None, student_id=None):
     query = base_query % {'fields': fields, 'places': places}
     db_connection.execute(query, params)
 
-    return ensure_unique(db_connection.execute("SELECT last_insert_rowid()").fetchall())
+    return last_insert_rowid(db_connection)
 
 def select_grades(db_connection, student_id=None, course_id=None, assignment_id=None):
     """Get a result set of grades for a given student or course.
        The rows in the result set have the format:
-       (student_id, course_id, assignment_id, assignment_name, grade_id, grade_value)
+       (grade_id, student_id, course_id, assignment_id, assignment_name, grade_value)
        course_id may be supplied to limit results to one course.
     """
     base_query = """
-    SELECT students.id, assignments.course_id, assignments.id, assignments.name, grades.id, grades.value
+    SELECT grades.id, students.id, assignments.course_id, assignments.id, assignments.name, grades.value
     FROM grades, assignments, students
     ON grades.assignment_id=assignments.id AND grades.student_id=students.id
     %(where)s
@@ -534,3 +535,7 @@ def make_values_clause(fields, values):
             places.append('?')
     
     return ', '.join(used_fields), ', '.join(places), tuple(params)
+
+def last_insert_rowid(db_connection):
+    "Returns the id of the last inserted row"
+    return ensure_unique(db_connection.execute("SELECT last_insert_rowid()").fetchall())
