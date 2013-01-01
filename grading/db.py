@@ -564,3 +564,55 @@ def make_values_clause(fields, values):
 def last_insert_rowid(db_connection):
     "Returns the id of the last inserted row"
     return ensure_unique(db_connection.execute("SELECT last_insert_rowid()").fetchall())
+
+#
+# Constructors/validators
+#
+def number_in_range(s, constructor, mn, mx):
+    """Convert s to a number and validate that it occurs in a given range.
+       Min bound is inclusive; max bound is exclusive."""
+    n = constructor(s)
+    if not (mn <= n and n < mx):
+        raise ValueError("Number %s outside acceptable range [%s, %s)" %
+                         (n, mn, mx))
+    return n
+
+def int_in_range(s, mn, mx):
+    return number_in_range(s, int, mn, mx)
+
+def float_in_range(s, mn, mx):
+    return number_in_range(s, float, mn, mx)
+
+def year(s):
+    "Convert s to a calendar year"
+    return int_in_range(s, 1985, 2100)
+
+def semester(s):
+    "Convert s to a semester-designating string"
+    S = s.strip().title()
+    if S not in ['Fall', 'Spring', 'Summer']:
+        raise ValueError("Not a semester designation: %s" % s)
+    return S
+
+def percentage_grade(s):
+    "Convert s to a percentage grade"
+    return float_in_range(s, 0, 100.1)
+
+def four_point_grade(s):
+    "Convert s to a grade on a 4.0 scale"
+    return float_in_range(s, 0.0, 4.0)
+
+def letter_grade(s):
+    "Ensure s is a letter grade"
+    letter_grades = [
+        'A+', 'A', 'A-',
+        'B+', 'B', 'B-',
+        'C+', 'C', 'C-',
+        'D+', 'D', 'D-',
+        'F', 'I'
+    ]
+    g = s.strip().upper()
+    if g not in letter_grades:
+        raise ValueError("Not a letter grade: %s" % s)
+    return g
+    
