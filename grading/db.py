@@ -122,7 +122,7 @@ def gradedb_clear(db_connection):
 #
 # basic CRUD operations and some convenience interfaces
 #
-def select_courses(db_connection, year=None, semester=None, name=None, number=None):
+def select_courses(db_connection, course_id=None, year=None, semester=None, name=None, number=None):
     """Return a result set of courses.
        Rows in the result set have the format:
        (id, name, number, year, semester)
@@ -133,8 +133,9 @@ def select_courses(db_connection, year=None, semester=None, name=None, number=No
     %(where)s
     """
     constraints, params = \
-        make_conjunction_clause(['courses.year', 'courses.semester', 'courses.name', 'courses.number'],
-                                [year, semester, name, number])
+        make_conjunction_clause(['courses.id', 'courses.year', 'courses.semester',
+                                 'courses.name', 'courses.number'],
+                                [course_id, year, semester, name, number])
     query = add_where_clause(base_query, constraints)
     
     return db_connection.execute(query, params).fetchall()
@@ -153,7 +154,8 @@ def create_course(db_connection, year=None, semester=None, name=None, number=Non
 
     return last_insert_rowid(db_connection)
     
-def select_assignments(db_connection, course_id=None, year=None, semester=None, name=None):
+def select_assignments(db_connection, assignment_id=None, course_id=None,
+                       year=None, semester=None, name=None):
     """Return a result set of assignments.
        The rows in the result set have the format:
        (assignment_id, course_id, assignment_name)
@@ -165,8 +167,9 @@ def select_assignments(db_connection, course_id=None, year=None, semester=None, 
     %(where)s
     """
     constraints, params = make_conjunction_clause(
-        ['courses.year', 'courses.semester', 'courses.id', 'assignments.name'],
-        [year, semester, course_id, name])
+        ['assignments.id', 'courses.year', 'courses.semester',
+         'courses.id', 'assignments.name'],
+        [assignment_id, year, semester, course_id, name])
     query = add_where_clause(base_query, constraints)
     
     return db_connection.execute(query, params).fetchall()
