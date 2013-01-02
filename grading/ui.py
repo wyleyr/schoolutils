@@ -28,16 +28,20 @@ class SimpleUI(BaseUI):
             self.change_database()
 
         while True:
-            self.actions_menu("Main menu.",
-                            [self.change_database,
-                             self.change_course,
-                             #self.import_students,
-                             #self.change_assignment,
-                             #self.enter_grades,
-                             #self.calculate_grades,
-                             #self.import_grades,
-                             #self.export_grades,
-                             self.exit])
+            self.print_db_info()
+            self.print_course_info()
+            self.print_assignment_info()
+            self.actions_menu(
+                "Main menu.",
+                [self.change_database,
+                 self.change_course,
+                 #self.import_students,
+                 self.change_assignment,
+                 #self.enter_grades,
+                 #self.calculate_grades,
+                 #self.import_grades,
+                 #self.export_grades,
+                 self.exit])
 
     def close_database(self):
         """Close the current database connection."""
@@ -49,15 +53,15 @@ class SimpleUI(BaseUI):
             self.db_file = None
 
     def change_database(self):
-        """Open a new database connection.
-           Closes the current connection (if any) and opens another database."""
+        """Open a new database.
+           Closes the current database connection (if any) and opens another."""
         if self.db_connection:
             self.close_database()
         
         db_path = typed_input("Enter path to grade database: ", file_path)
         if not os.path.exists(db_path):
             create = typed_input(
-                "No existing database at %s.  Create (Y/N)? " % file_path,
+                "No existing database at %s.  Create (Y/N)? " % db_path,
                 yn_bool)
             if create:
                 self.db_file = db_path
@@ -93,8 +97,7 @@ class SimpleUI(BaseUI):
                                     year=year, semester=semester,
                                     name=course_name, number=course_num)
 
-        format = "%s %d: %s, %s"  # semester, year, num, name
-        course_to_str = lambda c: format % (c[4], c[3], c[2], c[1])
+        course_to_str = lambda c: "{4} {3}: {2} {1}".format(*c)
         if len(courses) == 1:
             course = courses[0]
             print "Found 1 course; selecting: %s" % course_to_str(course)
@@ -138,14 +141,55 @@ class SimpleUI(BaseUI):
 
     def select_assignment(self):
         """Select an assignment.
+           Lookup an existing assignment in the database.
         """
-        pass
+        if not self.course_id:
+            print "You must select a course before selecting an assignment"
+            self.change_course()
+            
+        assignments = db.select_assignments(self.db_connection,
+                                            course_id=self.course_id)
+        assignment_to_str = lambda a: "{2} (due {3})".format(*a)
+        if len(assignments) == 0:
+            create = typed_input(
+                "No assignments found for the current course.  Create? (Y/N) ",
+                yn_bool)
+            if create:
+                return self.create_assignment()
+            else:
+                print "No assignment selected or created."
+        else:
+            assignment = self.options_menu(
+                "Select an assignment for this course:",
+                assignments, assignment_to_str,
+                escape=self.create_assignment, allow_none=True)
+            if assignment:
+                self.assignment_id = assignment[0]
+                
+        self.print_assignment_info() 
     
     def create_assignment(self):
         """Create a new assignment.
+           Add a new assignment to the database and select it as the current assignment.
         """
-        pass
+        if not self.course_id:
+            print "You must select a course before creating an assignment"
+            self.change_course()
 
+        name = typed_input("Enter assignment name: ", str)
+        description = typed_input("Enter description: ", str, default='')
+        due_date = typed_input("Enter due date (YYYY-MM-DD): ", db.date)
+        grade_type = typed_input("Enter grade type: ", str)
+        weight = typed_input("Enter weight (as decimal): ", float)
+
+        self.assignment_id = db.create_assignment(
+            self.db_connection,
+            course_id=self.course_id,
+            name=name, description=description, grade_type=grade_type,
+            due_date=due_date, weight=weight)
+
+        self.print_assignment_info()
+            
     def import_students(self):
         pass
 
@@ -198,36 +242,49 @@ class SimpleUI(BaseUI):
 
         validator = lambda s: db.int_in_range(s, 0, len(options))
         i = typed_input(prompt, validator, default=default)
+        print "" # visually separate menu and selection 
         
         return options[i]()
 
-    def options_menu(self, query, options, formatter, allow_none=False):
+    def options_menu(self, query, options, formatter,
+                     escape=None, allow_none=False):
         """Present a menu of options to the user.
            query should be a string to print before the list of options
            options should be a list of values
            formatter should be a callable that returns a string
              representation of a given option.
+           escape, if provided, should be a callable to run in lieu of returning
+             a selected value
            allow_none, if true, will add an option for the user to make no selection.
            Returns the selected option or None.
         """
         print ""
         print query
         menu_format = "{0:>3d}: {1}"
+        max_index = len(options) - 1
+        escape_option = None
+        none_option = None
         for i, o in enumerate(options):
             print menu_format.format(i, formatter(o))
-
+        if escape:
+            escape_option = max_index 
+            max_index += 1
+            print menu_format.format(max_index, escape.__doc__.splitlines()[0])
         if allow_none:
-            mx = len(options) 
-            print menu_format.format(mx, "None of the above")
-            validator = lambda s: db.int_in_range(s, 0, mx+1)
-        else:
-            validator = lambda s: db.int_in_range(s, 0, len(options)+1)
+            none_option = max_index
+            max_index += 1
+            print menu_format.format(max_index, "None of the above")
+
+        validator = lambda s: db.int_in_range(s, 0, max_index+1)
             
         idx = typed_input("Which option? (enter a number): ", validator)
-
+        print "" # visually separate menu and selection input 
+        
         if idx < len(options):
             return options[idx]
-        else:
+        elif idx == escape_option:
+            return escape()
+        elif idx == none_option:
             return None
         
     def print_course_info(self):
