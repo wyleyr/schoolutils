@@ -158,10 +158,10 @@ def select_assignments(db_connection, assignment_id=None, course_id=None,
                        year=None, semester=None, name=None):
     """Return a result set of assignments.
        The rows in the result set have the format:
-       (assignment_id, course_id, assignment_name)
+       (assignment_id, course_id, assignment_name, due_date)
     """
     base_query = """
-    SELECT assignments.id, courses.id, assignments.name
+    SELECT assignments.id, courses.id, assignments.name, assignments.due_date
     FROM assignments, courses
     ON assignments.course_id=courses.id
     %(where)s
@@ -590,6 +590,14 @@ def year(s):
     "Convert s to a calendar year"
     return int_in_range(s, 1985, 2100)
 
+def month(s):
+    "Convert s to a calendar month"
+    return int_in_range(s, 1, 13)
+
+def day(s):
+    "Convert s to a calendar day"
+    return int_in_range(s, 1, 32)
+
 def semester(s):
     "Convert s to a semester-designating string"
     S = s.strip().title()
@@ -618,4 +626,13 @@ def letter_grade(s):
     if g not in letter_grades:
         raise ValueError("Not a letter grade: %s" % s)
     return g
+    
+def date(s):
+    """Convert s to a datetime.date.
+       s is assumed to be in YYYY-MM-DD format"""
+    y, m, d = s.strip().split('-')
+    y = year(y)
+    m = month(m)
+    d = day(m)
+    return datetime.date(y, m, d)
     
