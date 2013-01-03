@@ -193,8 +193,9 @@ def create_assignment(db_connection, course_id=None, name=None, description=None
 
     return last_insert_rowid(db_connection)
   
-def select_students(db_connection, year=None, semester=None, course_id=None,
-                    course_name=None, last_name=None, first_name=None, sid=None):
+def select_students(db_connection, student_id=None, year=None, semester=None,
+                    course_id=None, course_name=None, last_name=None,
+                    first_name=None, sid=None):
     """Return a result set of students.
        The rows in the result set have the format:
        (student_id, last_name, first_name, sid)
@@ -207,8 +208,10 @@ def select_students(db_connection, year=None, semester=None, course_id=None,
     %(where)s
     """
     fields = ['courses.year', 'courses.semester', 'courses.id', 'courses.name',
-              'students.last_name', 'students.first_name', 'students.sid']
-    vals = [year, semester, course_id, course_name, last_name, first_name, sid]
+              'students.id', 'students.last_name', 'students.first_name',
+              'students.sid']
+    vals = [year, semester, course_id, course_name, student_id, last_name,
+            first_name, sid]
     constraints, params = make_conjunction_clause(fields, vals)
     query = add_where_clause(base_query, constraints)
     
