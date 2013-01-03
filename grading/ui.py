@@ -37,7 +37,7 @@ class SimpleUI(BaseUI):
                  self.change_course,
                  #self.import_students,
                  self.change_assignment,
-                 #self.enter_grades,
+                 self.enter_grades,
                  #self.calculate_grades,
                  #self.import_grades,
                  #self.export_grades,
@@ -74,8 +74,53 @@ class SimpleUI(BaseUI):
             self.db_connection = sqlite3.connect(db_path)
             
     def enter_grades(self):
-        pass
+        """Enter grades.
+           Enter grades for the current assignment for individual students."""
+        if not self.course_id:
+            # WONTFIX: this doesn't actually guarantee a self.course_id
+            print "You must select a course before entering grades"
+            self.change_course()
 
+        if not self.assignment_id:
+            print "You much select an assignment before entering grades"
+            self.change_assignment()
+
+        print ""
+        print "Use Control-C to finish entering grades."
+        while True:
+            try:
+                student_id, last_name, first_name, sid = self.get_student()
+                print "Selected: {0}, {1} (sid: {2})".format(
+                    last_name, first_name, sid)
+                grade_id = None
+                grade_val = typed_input("Enter grade value: ", str)
+                existing_grades = db.select_grades(self.db_connection,
+                                                   student_id=student_id,
+                                                   course_id=self.course_id,
+                                                   assignment_id=self.assignment_id)
+                if existing_grades:
+                    print "Student has existing grades for this assignment."
+                    update = typed_input("Update/overwrite? (Y/N) ", yn_bool)
+                    if update:
+                        if len(existing_grades) == 1:
+                            print "Will update existing grade."
+                            grade = existing_grades[0]
+                        else:
+                            grade = self.options_menu(
+                                "Select a grade to update.",
+                                existing_grades,
+                                lambda g: "{4}: {5}".format(*g))
+                        grade_id = grade[0]
+
+                db.create_or_update_grade(self.db_connection,
+                                          grade_id=grade_id,
+                                          assignment_id=self.assignment_id,
+                                          student_id=student_id,
+                                          value=grade_val)
+                                          
+            except KeyboardInterrupt:
+                break
+            
     def change_course(self):
         """Change current course.
            Select an existing course from the database, or add a new one."""
@@ -113,8 +158,6 @@ class SimpleUI(BaseUI):
                 print "Selected: %s" % course_to_str(course)
                 self.course_id = course[0]
 
-        self.print_course_info()
-        
     def create_course(self):
         """Create a new course.
            Add a new course to the database and select it as the current
@@ -130,11 +173,10 @@ class SimpleUI(BaseUI):
             name=course_name, number=course_num)
 
         self.course_id = course_id
-        self.print_course_info()
 
     def change_assignment(self):
         """Change current assignment.
-           Select an existing assignment from the databse, or add a new one"""
+           Select an existing assignment from the database, or add a new one"""
         self.print_assignment_info()
         self.actions_menu("What do you want to do?",
             [self.select_assignment, self.create_assignment])
@@ -166,8 +208,6 @@ class SimpleUI(BaseUI):
             if assignment:
                 self.assignment_id = assignment[0]
                 
-        self.print_assignment_info() 
-    
     def create_assignment(self):
         """Create a new assignment.
            Add a new assignment to the database and select it as the current assignment.
@@ -188,8 +228,6 @@ class SimpleUI(BaseUI):
             name=name, description=description, grade_type=grade_type,
             due_date=due_date, weight=weight)
 
-        self.print_assignment_info()
-            
     def import_students(self):
         pass
 
@@ -314,7 +352,54 @@ class SimpleUI(BaseUI):
              print "Database open at %s" % self.db_file
          else:
              print "No current database connection"
+
+    def get_student(self):
+        """Lookup a student in the database, trying several methods.
+           Create a new student if none exists; return student row"""
+        student = None
+        first_name = ''
+        last_name = ''
+        sid = ''
         
+        try:
+            sid = typed_input("Enter SID: ", db.sid, default='')
+            student_id = db.get_student_id(self.db_connection, sid=sid)
+        except db.GradeDBException: # either 0 or multiple records found
+            last_name = typed_input("Enter last name: ", db.name, default='')
+            first_name = typed_input("Enter first name: ", db.name, default='')
+
+        try:
+            # TODO? we can end up returning students who are not members of the
+            # current course; offer to add them...
+            student_id = db.get_student_id(self.db_connection,
+                                           last_name=last_name,
+                                           first_name=first_name,
+                                           sid=sid)
+        except db.NoRecordsFound:
+            create = typed_input("No student found; create? (Y/N) ", yn_bool)
+            if create:
+                student_id = db.create_student(
+                    first_name=first_name, last_name=last_name, sid=sid)
+            else:
+                print "Could not locate student with these criteria; try again."
+                return self.get_student()
+        except db.MultipleRecordsFound:
+            students = db.select_students(self.db_connection,
+                                          last_name=last_name,
+                                          first_name=first_name,
+                                          course_id=self.course_id,
+                                          sid=sid)
+            student = self.options_menu(
+                "Which student did you mean?",
+                students, 
+                lambda s: "{1}, {2} ({3})".format(*s))
+            student_id = student[0]
+
+        if not student:
+            student = db.select_students(self.db_connection, student_id=student_id)[0]
+            
+        return student
+            
 #
 # Utilities
 # 
@@ -346,6 +431,9 @@ def typed_input(prompt1, constructor, prompt2=None, default=None):
 
     return val
 
+#
+# Constructors/validators
+# 
 def file_path(s):
     """Convert a string to a file path.
        The passed string may contain '~' and will be expanded to an absolute
