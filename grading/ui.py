@@ -4,10 +4,31 @@ ui.py
 User interfaces for grading utilities.
 """
 import os, sqlite3
-import db
+import db, bspace
 
 class BaseUI(object):
     pass
+
+def require(attribute, callback, message):
+    """Require that an object has an attribute before executing a method.
+       attribute should be the attribute name.
+       callback should be a method that will mutate the object to provide
+         the attribute when it doesn't exist; it will be called with the object
+         as an argument
+       message should be a message to print to the user before callback is
+         called""" 
+    def method_factory(f):
+        def method(self, *args, **kwargs):
+            attr = getattr(self, attribute, None)
+            while not attr:
+                print ""
+                print message
+                callback(self)
+                attr = getattr(self, attribute, None)
+            return f(self, *args, **kwargs)
+        method.__doc__ = f.__doc__  # preserve docstring for actions_menu  
+        return method
+    return method_factory
 
 class SimpleUI(BaseUI):
     """Manages a simple (command line) user interface.
@@ -21,28 +42,7 @@ class SimpleUI(BaseUI):
         self.course_id = None
         self.assignment_id = None
 
-    # Top-level screens:
-    def main_loop(self):
-        "Main menu"
-        if not self.db_connection:
-            self.change_database()
-
-        while True:
-            self.print_db_info()
-            self.print_course_info()
-            self.print_assignment_info()
-            self.actions_menu(
-                "Main menu.",
-                [self.change_database,
-                 self.change_course,
-                 #self.import_students,
-                 self.change_assignment,
-                 self.enter_grades,
-                 #self.calculate_grades,
-                 #self.import_grades,
-                 #self.export_grades,
-                 self.exit])
-
+    # Top-level actions:
     def close_database(self):
         """Close the current database connection."""
         if self.db_connection:
@@ -52,6 +52,7 @@ class SimpleUI(BaseUI):
             self.db_connection = None
             self.db_file = None
 
+            
     def change_database(self):
         """Open a new database.
            Closes the current database connection (if any) and opens another."""
@@ -72,19 +73,163 @@ class SimpleUI(BaseUI):
         else:
             self.db_file = db_path
             self.db_connection = sqlite3.connect(db_path)
+
             
+    @require('db_connection', change_database, "")
+    def main_loop(self):
+        "Main menu"
+        while True:
+            self.print_db_info()
+            self.print_course_info()
+            self.print_assignment_info()
+            self.actions_menu(
+                "Main menu.",
+                [self.change_database,
+                 self.change_course,
+                 self.change_assignment,
+                 self.import_students,
+                 self.enter_grades,
+                 #self.calculate_grades,
+                 #self.import_grades,
+                 #self.export_grades,
+                 self.exit])
+
+           
+    @require('db_connection', change_database,
+             "A database connection is required to change the current course.")
+    def change_course(self):
+        """Change current course.
+           Select an existing course from the database, or add a new one.
+        """
+        self.print_course_info()
+        self.actions_menu("What do you want to do?",
+                        [self.select_course,
+                         self.create_course])
+
+        
+    @require('db_connection', change_database,
+             "A database connection is required to select a course.")
+    def select_course(self):
+        """Select an existing course.
+           Lookup an existing course in the database by semester, name, or number.
+        """
+        print "(Press Enter to skip a given search criterion)"
+        year = typed_input("Enter year: ", db.year, default='') or None
+        semester = typed_input("Enter semester: ", db.semester, default='') or None
+        course_num = typed_input("Enter course number: ", str) or None
+        course_name = typed_input("Enter course name: ", str) or None
+
+        courses = db.select_courses(self.db_connection,
+                                    year=year, semester=semester,
+                                    name=course_name, number=course_num)
+
+        course_to_str = lambda c: "{4} {3}: {2} {1}".format(*c)
+        if len(courses) == 1:
+            course = courses[0]
+            print "Found 1 course; selecting: %s" % course_to_str(course)
+            self.course_id = course[0]
+        elif len(courses) == 0:
+            print "No courses found matching those criteria; please try again."
+            return self.change_course()
+        else:
+            course = self.options_menu(
+                "Multiple courses found; please select one:",
+                courses, course_to_str, allow_none=True)
+            if course:
+                print "Selected: %s" % course_to_str(course)
+                self.course_id = course[0]
+
+                
+    @require('db_connection', change_database,
+             "A database connection is required to create a course")
+    def create_course(self):
+        """Create a new course.
+           Add a new course to the database and select it as the current
+           course.
+        """
+        year = typed_input("Enter year: ", db.year)
+        semester = typed_input("Enter semester: ", db.semester)
+        course_num = typed_input("Enter course number: ", str)
+        course_name = typed_input("Enter course name: ", str)
+
+        course_id = db.create_course(
+            self.db_connection,
+            year=year, semester=semester,
+            name=course_name, number=course_num)
+
+        self.course_id = course_id
+
+        
+    @require('db_connection', change_database,
+             "A database connection is required to change the current assignment.")
+    def change_assignment(self):
+        """Change current assignment.
+           Select an existing assignment from the database, or add a new one.
+        """
+        self.print_assignment_info()
+        self.actions_menu("What do you want to do?",
+            [self.select_assignment, self.create_assignment])
+
+        
+    @require('db_connection', change_database,
+             "A database connection is required to select an assignment.")
+    @require('course_id', change_course,
+             "A selected course is required to select an assignment.")
+    def select_assignment(self):
+        """Select an assignment.
+           Lookup an existing assignment in the database.
+        """
+        assignments = db.select_assignments(self.db_connection,
+                                            course_id=self.course_id)
+        assignment_to_str = lambda a: "{2} (due {3})".format(*a)
+        if len(assignments) == 0:
+            create = typed_input(
+                "No assignments found for the current course.  Create? (Y/N) ",
+                yn_bool)
+            if create:
+                return self.create_assignment()
+            else:
+                print "No assignment selected or created."
+        else:
+            assignment = self.options_menu(
+                "Select an assignment for this course:",
+                assignments, assignment_to_str,
+                escape=self.create_assignment, allow_none=True)
+            if assignment:
+                self.assignment_id = assignment[0]
+                
+            
+    @require('db_connection', change_database,
+             "A database connection is required to create an assignment.")
+    @require('course_id', change_course,
+             "A selected course is required to create an assignment.")
+    def create_assignment(self):
+        """Create a new assignment.
+           Add a new assignment to the database and select it as the current assignment.
+        """
+        name = typed_input("Enter assignment name: ", str)
+        description = typed_input("Enter description: ", str, default='')
+        due_date = typed_input("Enter due date (YYYY-MM-DD): ", db.date)
+        grade_type = typed_input("Enter grade type: ", str)
+        weight = typed_input("Enter weight (as decimal): ", float)
+
+        self.assignment_id = db.create_assignment(
+            self.db_connection,
+            course_id=self.course_id,
+            name=name, description=description, grade_type=grade_type,
+            due_date=due_date, weight=weight)
+
+        
+    @require('db_connection', change_database,
+             "A database connection is required to enter grades.")
+    @require('course_id', change_course,
+             "A selected course is required to enter grades.")
+    @require('assignment_id', change_assignment,
+             "A selected assignment is required to enter grades.")
     def enter_grades(self):
         """Enter grades.
-           Enter grades for the current assignment for individual students."""
-        if not self.course_id:
-            # WONTFIX: this doesn't actually guarantee a self.course_id
-            print "You must select a course before entering grades"
-            self.change_course()
-
-        if not self.assignment_id:
-            print "You much select an assignment before entering grades"
-            self.change_assignment()
-
+           Enter grades for the current assignment for individual students.
+        """
         print ""
         print "Use Control-C to finish entering grades."
         while True:
@@ -119,118 +264,67 @@ class SimpleUI(BaseUI):
                                           value=grade_val)
                                           
             except KeyboardInterrupt:
+                print ""
                 break
-            
-    def change_course(self):
-        """Change current course.
-           Select an existing course from the database, or add a new one."""
-        self.print_course_info()
-        self.actions_menu("What do you want to do?",
-                        [self.select_course,
-                         self.create_course])
-                        
-    def select_course(self):
-        """Select an existing course.
-           Lookup an existing course in the database by semester, name, or number."""
-        print "(Press Enter to skip a given search criterion)"
-        year = typed_input("Enter year: ", db.year, default='') or None
-        semester = typed_input("Enter semester: ", db.semester, default='') or None
-        course_num = typed_input("Enter course number: ", str) or None
-        course_name = typed_input("Enter course name: ", str) or None
 
-        courses = db.select_courses(self.db_connection,
-                                    year=year, semester=semester,
-                                    name=course_name, number=course_num)
-
-        course_to_str = lambda c: "{4} {3}: {2} {1}".format(*c)
-        if len(courses) == 1:
-            course = courses[0]
-            print "Found 1 course; selecting: %s" % course_to_str(course)
-            self.course_id = course[0]
-        elif len(courses) == 0:
-            print "No courses found matching those criteria; please try again."
-            return self.change_course()
-        else:
-            course = self.options_menu(
-                "Multiple courses found; please select one:",
-                courses, course_to_str, allow_none=True)
-            if course:
-                print "Selected: %s" % course_to_str(course)
-                self.course_id = course[0]
-
-    def create_course(self):
-        """Create a new course.
-           Add a new course to the database and select it as the current
-           course."""
-        year = typed_input("Enter year: ", db.year)
-        semester = typed_input("Enter semester: ", db.semester)
-        course_num = typed_input("Enter course number: ", str)
-        course_name = typed_input("Enter course name: ", str)
-
-        course_id = db.create_course(
-            self.db_connection,
-            year=year, semester=semester,
-            name=course_name, number=course_num)
-
-        self.course_id = course_id
-
-    def change_assignment(self):
-        """Change current assignment.
-           Select an existing assignment from the database, or add a new one"""
-        self.print_assignment_info()
-        self.actions_menu("What do you want to do?",
-            [self.select_assignment, self.create_assignment])
-
-    def select_assignment(self):
-        """Select an assignment.
-           Lookup an existing assignment in the database.
-        """
-        if not self.course_id:
-            print "You must select a course before selecting an assignment"
-            self.change_course()
-            
-        assignments = db.select_assignments(self.db_connection,
-                                            course_id=self.course_id)
-        assignment_to_str = lambda a: "{2} (due {3})".format(*a)
-        if len(assignments) == 0:
-            create = typed_input(
-                "No assignments found for the current course.  Create? (Y/N) ",
-                yn_bool)
-            if create:
-                return self.create_assignment()
-            else:
-                print "No assignment selected or created."
-        else:
-            assignment = self.options_menu(
-                "Select an assignment for this course:",
-                assignments, assignment_to_str,
-                escape=self.create_assignment, allow_none=True)
-            if assignment:
-                self.assignment_id = assignment[0]
-                
-    def create_assignment(self):
-        """Create a new assignment.
-           Add a new assignment to the database and select it as the current assignment.
-        """
-        if not self.course_id:
-            print "You must select a course before creating an assignment"
-            self.change_course()
-
-        name = typed_input("Enter assignment name: ", str)
-        description = typed_input("Enter description: ", str, default='')
-        due_date = typed_input("Enter due date (YYYY-MM-DD): ", db.date)
-        grade_type = typed_input("Enter grade type: ", str)
-        weight = typed_input("Enter weight (as decimal): ", float)
-
-        self.assignment_id = db.create_assignment(
-            self.db_connection,
-            course_id=self.course_id,
-            name=name, description=description, grade_type=grade_type,
-            due_date=due_date, weight=weight)
-
+    @require('db_connection', change_database,
+             "A database connection is required to import students.")
+    @require('course_id', change_course,
+             "A selected course is required to import students.")
     def import_students(self):
-        pass
+        """Import students.
+           Import students from a CSV file as members of the current course.
+        """
+        csv_path = typed_input("Enter path to CSV file: ", file_path)
+        if not os.path.exists(csv_path):
+            retry = typed_input("File %s does not exist; try again? (Y/N) " %
+                                csv_path, yn_bool)
+            if retry:
+                return self.import_students()
+            else:
+                return None
 
+        # assume, for now, that CSV files have been generated by bSpace:
+        students = bspace.roster_csv_to_students(csv_path)
+        formatter = lambda s: "{last_name: <15s} {first_name: <20s} {email: <30s} {sid: <8}".format(**s)
+        editor = lambda s: self.edit_dict(s, skip=['full_name'])
+        creator = lambda: self.edit_dict({'last_name':'',
+                                          'first_name':'',
+                                          'sid':'',
+                                          'email':''},
+                                         validators={
+                                          'last_name': db.name,
+                                          'first_name': db.name,
+                                          'sid': db.sid,
+                                         })
+        header = formatter({'last_name': "Last name", 'first_name': "First name",
+                            'email': "Email", 'sid': "SID"})
+        students = self.edit_table(students, header, formatter, editor, creator)
+
+        for s in students:
+            try:
+                student_id = db.get_student_id(self.db_connection,
+                                               sid=s['sid'],
+                                               first_name=s['first_name'],
+                                               last_name=s['last_name'])
+            except db.NoRecordsFound:
+                student_id = None
+
+            student_id = db.create_or_update_student(
+                self.db_connection,
+                student_id=student_id,
+                last_name=s['last_name'],
+                first_name=s['first_name'],
+                sid=s['sid'],
+                # TODO: email...
+                )
+            course_member_id = db.create_course_member(
+                self.db_connection,
+                student_id=student_id,
+                course_id=self.course_id)
+
+        print "%d students imported successfully." % len(students)
+            
     def import_grades(self):
         pass
 
