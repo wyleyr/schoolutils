@@ -673,4 +673,4 @@ def sid(s):
 
 def name(s):
     """Ensure s looks like a name"""
-    return s.strip().title()
+    return s.strip().upper()
