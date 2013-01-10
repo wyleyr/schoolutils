@@ -294,10 +294,27 @@ def update_student(db_connection, student_id=None, last_name=None,
     
     return student_id
 
-def create_or_update_student():
-    # Do I need this function?  Should the logic be in Python, or
-    # should I use INSERT OR REPLACE?
-    raise NotImplementedError
+def create_or_update_student(db_connection, student_id=None, last_name=None,
+                             first_name=None, sid=None):
+    """Create a new student or update a record of an existing student.
+       Returns the id of the created or updated row.
+       WARNING: This function uses SQLite's INSERT OR REPLACE
+       statement rather than an UPDATE statement.  If you pass
+       student_id, it *will* erase data in an existing row of the students
+       table; you must provide all values to replace the existing data. 
+    """
+    base_query = """
+    INSERT OR REPLACE INTO students (%(fields)s) VALUES (%(places)s);
+    """
+    fields, places, params = make_values_clause(
+        ['id', 'last_name', 'first_name', 'sid'],
+        [student_id, last_name, first_name, sid])    
+    
+    query = base_query % {'fields': fields, 'places': places}
+    db_connection.execute(query, params)
+    
+    return last_insert_rowid(db_connection)
+
 
 def create_course_member(db_connection, course_id=None, student_id=None):
     """Create a new course_membership record in the database.
