@@ -237,7 +237,7 @@ class SimpleUI(BaseUI):
         print "Use Control-C to finish entering grades."
         while True:
             try:
-                student_id, last_name, first_name, sid = self.get_student()
+                student_id, last_name, first_name, sid, _ = self.get_student()
                 print "Selected: {0}, {1} (sid: {2})".format(
                     last_name, first_name, sid)
                 grade_id = None
@@ -299,6 +299,7 @@ class SimpleUI(BaseUI):
                                           'last_name': db.name,
                                           'first_name': db.name,
                                           'sid': db.sid,
+                                          'email': db.email,
                                          })
         header = formatter({'last_name': "Last name", 'first_name': "First name",
                             'email': "Email", 'sid': "SID"})
@@ -319,8 +320,7 @@ class SimpleUI(BaseUI):
                 last_name=s['last_name'],
                 first_name=s['first_name'],
                 sid=s['sid'],
-                # TODO: email...
-                )
+                email=s['email'])
             course_member_id = db.create_course_member(
                 self.db_connection,
                 student_id=student_id,

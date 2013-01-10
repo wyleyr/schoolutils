@@ -753,3 +753,10 @@ def sid(s):
 def name(s):
     """Ensure s looks like a name"""
     return s.strip().upper()
+
+def email(s):
+    """Ensure s looks like an email address"""
+    e = s.lower()
+    if '@' not in e:
+        raise ValueError("%s does not appear to be an email address" % s)
+    return e
