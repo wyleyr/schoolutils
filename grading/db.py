@@ -201,13 +201,23 @@ def select_students(db_connection, student_id=None, year=None, semester=None,
        The rows in the result set have the format:
        (student_id, last_name, first_name, sid)
     """
-    base_query = """
-    SELECT students.id, students.last_name, students.first_name, students.sid
-    FROM students, course_memberships, courses
-    ON course_memberships.student_id=students.id AND
-       course_memberships.course_id=courses.id
-    %(where)s
-    """
+    if course_id or course_name: 
+        base_query = """
+        SELECT students.id, students.last_name, students.first_name, students.sid
+        FROM students, course_memberships, courses
+        ON (course_memberships.student_id=students.id AND
+            course_memberships.course_id=courses.id)
+        %(where)s
+        """
+    else:
+        # don't perform a join without any course information to constrain the query:
+        # that leads to duplicate results! (and it's slower)
+        base_query = """
+        SELECT students.id, students.last_name, students.first_name, students.sid
+        FROM students
+        %(where)s
+        """
+
     fields = ['courses.year', 'courses.semester', 'courses.id', 'courses.name',
               'students.id', 'students.last_name', 'students.first_name',
               'students.sid']
