@@ -418,6 +418,99 @@ class SimpleUI(BaseUI):
             return escape()
         elif idx == none_option:
             return None
+
+    def edit_table(self, rows, header, formatter, editor, creator=None):
+        """Present a simple interface for reviewing and editing tabular data.
+           rows should be a sequence of values for the user to review and edit
+           header should be a string to print above the table
+           formatter should be a function which, given a row value, returns a
+             string representing the row for display to the screen
+           editor should be a function which, given a row value, returns a
+             new row value based on user input
+           creator, if provided, should be a function with no arguments which
+             returns a new row value based on user input  
+           Returns the edited rows.
+        """
+        editable_rows = [r for r in rows]
+        header_underline = "-".ljust(80, "-")
+        row_format = "{index: >3}: {frow: <75s}"
+        def validator(s):
+            s = s.strip().lower()
+            if s.startswith('d'):
+                action = 'd'
+                idx = db.int_in_range(s[1:], 0, len(editable_rows)+1)
+            elif s.startswith('i'):
+                action = 'i'
+                idx = None
+            else:
+                action = 'e'
+                idx = db.int_in_range(s, 0, len(editable_rows)+1)
+            return action, idx
+                
+        while True:
+            try:
+                print row_format.format(index="Row", frow=header)
+                print header_underline
+                for i, r in enumerate(editable_rows):
+                    print row_format.format(index=i, frow=formatter(r))
+
+                print ""
+                prompt = ("Enter number to edit row (or Ctrl-C to end).\n"
+                          "Prefix row number with 'd' to delete")
+                if creator:
+                    prompt += "; enter 'i' to insert a new row: "
+                else:
+                    prompt += ": "
+                    
+                action, idx = typed_input(prompt, validator)
+                if action == 'e':
+                    editable_rows[idx] = editor(editable_rows[idx])
+                elif action == 'd':
+                    editable_rows.pop(idx)
+                elif action == 'i' and creator: 
+                    new_row = creator()
+                    editable_rows.append(new_row)
+
+            except KeyboardInterrupt:
+                print ""
+                break
+
+        return editable_rows
+
+    def edit_dict(self, d, validators=None, skip=None):
+        """Simple interface for editing the values in a dictionary.
+           Queries the user for a new value for each key in d, then
+             updates the dictionary with a new validated value.
+           d should be a dictionary of values with strings as keys
+             The keys will be pretty printed, split along '_', when
+             querying the user for new values.
+           validators, if given, should be a dictionary mapping keys
+             of d to functions validating input; str() will be used
+             as a default validator if none is provided for a given key
+           skip, if given, should be a list of keys in d to skip
+             querying the user for
+           Returns the updated dictionary.
+        """
+        if not validators:
+            validators = {}
+        if not skip:
+            skip = []
+
+        for k, v in d.iteritems():
+            if k in skip:
+                continue
+            
+            validator = validators.get(k, str)
+            pretty_field = ' '.join([word.strip().lower()
+                                     for word in k.split('_')])
+            pretty_current = (" (default: %s): " % v) if v else ": "
+            new_v = typed_input("Enter %s%s" % (pretty_field, pretty_current),
+                                validator)
+            if new_v:
+                d[k] = new_v
+
+        return d
+            
         
     def print_course_info(self):
         "Prints information about the currently selected course"
