@@ -51,6 +51,9 @@ class SimpleUI(BaseUI):
             self.db_connection.close()
             self.db_connection = None
             self.db_file = None
+            # these fields will now be invalid, so erase them too:
+            self.course_id = None
+            self.assignment_id = None
 
             
     def change_database(self):
@@ -275,7 +278,7 @@ class SimpleUI(BaseUI):
         """Import students.
            Import students from a CSV file as members of the current course.
         """
-        csv_path = typed_input("Enter path to CSV file: ", file_path)
+        csv_path = typed_input("Enter path to CSV file with student data to import: ", file_path)
         if not os.path.exists(csv_path):
             retry = typed_input("File %s does not exist; try again? (Y/N) " %
                                 csv_path, yn_bool)
@@ -637,3 +640,4 @@ def yn_bool(s):
         return False
     else:
         raise ValueError("Expected 'Y' or 'N': %s" % s)
+
