@@ -56,7 +56,7 @@ def gradedb_init(db_connection):
       course_id INTEGER NOT NULL,
       FOREIGN KEY(student_id) REFERENCES students(id),
       FOREIGN KEY(course_id) REFERENCES courses(id),
-      UNIQUE(student_id, course_id) ON CONFLICT REPLACE
+      UNIQUE(student_id, course_id) ON CONFLICT IGNORE
     );
     CREATE TABLE assignments (
       id INTEGER PRIMARY KEY,
