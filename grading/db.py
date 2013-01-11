@@ -366,7 +366,26 @@ def create_or_update_student(db_connection, student_id=None, last_name=None,
     
     return last_insert_rowid(db_connection)
 
+def select_course_memberships(db_connection, member_id=None, course_id=None,
+                              student_id=None):
+    """Return a result set of course memberships.
+       The rows in the result set have the format:
+         (course_membership_id, course_id, student_id)
+       For joins with students or courses table, see select_students and
+         select_courses.
+    """
+    base_query = """
+    SELECT id, course_id, student_id
+    FROM course_memberships
+    %(where)s
+    """
+    constraints, params = make_conjunction_clause(
+        ['id', 'course_id', 'student_id'],
+        [member_id, course_id, student_id])
+    query = add_where_clause(base_query, constraints)
 
+    return db_connection.execute(query, params).fetchall()
+    
 def create_course_member(db_connection, course_id=None, student_id=None):
     """Create a new course_membership record in the database.
        Returns the id of the inserted row.
@@ -382,6 +401,66 @@ def create_course_member(db_connection, course_id=None, student_id=None):
 
     return last_insert_rowid(db_connection)
 
+def delete_course_member(db_connection, member_id=None, course_id=None,
+                         student_id=None):
+    """Delete a course_membership record in the database.
+       Deletes any row from course_memberships where either:
+         id = member_id, OR
+         (course_id = course_id AND student_id = student_id)
+       You must pass either member_id or both course_id and student_id;
+         this function refuses to delete multiple rows.
+       To delete multiple rows, see delete_course_members.
+       Returns the number of deleted rows (which should not exceed 1).
+    """
+    # sanity check:
+    if not (member_id or (student_id and course_id)):
+        raise sqlite3.IntegrityError(
+            "delete_course_member requires either member_id or BOTH "
+            "student_id and course_id")
+
+    base_query = """
+    DELETE FROM course_memberships
+    %(where)s;
+    """
+    constraints, params = make_conjunction_clause(
+        ['course_id', 'student_id'],
+        [course_id, student_id])
+    constraints, params = make_disjunction_clause(
+        ['id'], [member_id],
+        extra=constraints, extra_params=params)
+    query = add_where_clause(base_query, constraints)
+
+    db_connection.execute(query, params)
+    return num_changes(db_connection)
+
+def delete_course_members(db_connection, member_id=None, course_id=None,
+                          student_id=None):
+    """Delete one or more course_membership records in the database.
+       Deletes any row matching the conjunction of the given criteria.
+       Refuses to delete rows if no constraints are provided; if you
+         wish to delete all rows in the table, use a custom
+         DELETE FROM or DROP TABLE statement.
+       Returns the number of deleted rows.
+    """
+    # sanity check:
+    if not (member_id or course_id or student_id):
+        raise sqlite3.IntegrityError(
+            "delete_course_members will not delete all rows in the "
+            "course_memberships table")
+    
+    base_query = """
+    DELETE FROM course_memberships
+    %(where)s;
+    """
+    constraints, params = make_conjunction_clause(
+        ['id', 'course_id', 'student_id'],
+        [member_id, course_id, student_id])
+    query = add_where_clause(base_query, constraints)
+
+    db_connection.execute(query, params)
+
+    return num_changes(db_connection)
+    
 def select_grades(db_connection, student_id=None, course_id=None,
                   assignment_id=None):
     """Get a result set of grades for a given student or course.
@@ -671,6 +750,11 @@ def last_insert_rowid(db_connection):
     "Returns the id of the last inserted row"
     return ensure_unique(
         db_connection.execute("SELECT last_insert_rowid()").fetchall())
+
+def num_changes(db_connection):
+    "Returns the number of rows affected by the last INSERT, UPDATE, or DELETE"
+    return ensure_unique(
+        db_connection.execute("SELECT changes()").fetchall())
 
 #
 # Constructors/validators
