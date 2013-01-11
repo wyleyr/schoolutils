@@ -197,10 +197,14 @@ def create_assignment(db_connection, course_id=None, name=None, description=None
   
 def select_students(db_connection, student_id=None, year=None, semester=None,
                     course_id=None, course_name=None, last_name=None,
-                    first_name=None, sid=None, email=None):
+                    first_name=None, sid=None, email=None,
+                    fuzzy=False):
     """Return a result set of students.
        The rows in the result set have the format:
        (student_id, last_name, first_name, sid, email)
+       If fuzzy is True, this function will use SQLite's LIKE clause to perform 
+         case-insensitive fuzzy matching on last_name, first_name, email, and
+         course_name fields 
     """
     if course_id or course_name: 
         base_query = """
@@ -221,56 +225,29 @@ def select_students(db_connection, student_id=None, year=None, semester=None,
         %(where)s
         """
 
-    fields = ['courses.year', 'courses.semester', 'courses.id', 'courses.name',
-              'students.id', 'students.last_name', 'students.first_name',
-              'students.sid', 'students.email']
-    vals = [year, semester, course_id, course_name, student_id, last_name,
-            first_name, sid, email]
-    constraints, params = make_conjunction_clause(fields, vals)
-    query = add_where_clause(base_query, constraints)
-    
-    return db_connection.execute(query, params).fetchall()
-
-def select_students_like(db_connection, student_id=None, year=None,
-                         semester=None, course_id=None, course_name=None,
-                         last_name=None, first_name=None, sid=None, email=None):
-    """Like select_students, except uses SQLite's LIKE clause to perform
-       case-insensitive matching on last_name, first_name, email, and
-       course_name fields.
-    """
-    if course_id or course_name: 
-        base_query = """
-        SELECT students.id, students.last_name, students.first_name, students.sid
-        FROM students, course_memberships, courses
-        ON (course_memberships.student_id=students.id AND
-            course_memberships.course_id=courses.id)
-        %(where)s
-        """
-    else:
-        # don't perform a join without any course information to constrain the query:
-        # that leads to duplicate results! (and it's slower)
-        base_query = """
-        SELECT students.id, students.last_name, students.first_name, students.sid
-        FROM students
-        %(where)s
-        """
-        
-    exact_fields = ['courses.year', 'courses.semester', 'courses.id', 
+    exact_fields = ['courses.year', 'courses.semester', 'courses.id',
                     'students.id', 'students.sid']
     exact_vals = [year, semester, course_id, student_id, sid]
-
-    # for now, just assume that we should glob on both left and right of every
-    # field with a LIKE constraint
-    add_glob = lambda s: '%' + s + '%' if s else s
-    like_fields = ['students.last_name', 'students.first_name', 'students.email',
-                   'courses.name']
-    like_vals = [add_glob(v) for v in (last_name, first_name, email, course_name)]
-    
+    fuzzy_fields = ['students.last_name', 'students.first_name', 'students.email',
+                    'courses.name']
+    fuzzy_vals = [last_name, first_name, email, course_name]
+       
+    if not fuzzy:
+        exact_fields = exact_fields + fuzzy_fields
+        exact_vals = exact_vals + fuzzy_vals
+        fuzzy_fields = fuzzy_vals = []
+    else:    
+        # for now, just assume that we should glob on both left and
+        # right of every field with a LIKE constraint
+        add_glob = lambda s: '%' + s + '%' if s else s
+        fuzzy_vals = [add_glob(v) for v in fuzzy_vals]
+        
     constraints, params = make_conjunction_clause(exact_fields, exact_vals)
-    constraints, params = make_conjunction_clause(like_fields, like_vals,
+    constraints, params = make_conjunction_clause(fuzzy_fields, fuzzy_vals,
                                                   extra=constraints,
                                                   extra_params=params,
                                                   cmp_op="LIKE")
+
     query = add_where_clause(base_query, constraints)
     
     return db_connection.execute(query, params).fetchall()
@@ -600,7 +577,8 @@ def overlay(old_values, new_values):
     return overlaid_vals
 
 def make_constraint_clause(connective, fields, values,
-                           extra='', extra_params=tuple()):
+                           extra='', extra_params=tuple(),
+                           cmp_op="="):
     """Construct a constraint clause and a set of parameters for it.
        Returns a tuple of the constaint clause as a string and the
        parameter values as a tuple.
@@ -610,32 +588,42 @@ def make_constraint_clause(connective, fields, values,
        a tuple of parameters to prepend to the generated parameters.
        Using these arguments, one can incrementally construct complex
        constraints, e.g. "(field1=? AND field2=?) OR field3=?"
+
+       cmp_op, if provided, should be a string specifying a binary
+       comparison operator.  The default is "="; "!=", "LIKE" etc.
+       are other useful options.  Spaces are automatically added on
+       either side and a parameter place '?' is added to the right
+       hand side
     """
     constraints = []
     params = []
     for f, v in zip(fields, values):
         if v:
-            constraints.append(f + "=?")
+            constraints.append(f + " " + cmp_op + " ?")
             params.append(v)
 
     if extra:
-        constraints.insert(0, "(" + extra +")")
+        constraints.insert(0, "(" + extra + ")")
         
     clause = connective.join(constraints)
     
     return clause, tuple(extra_params) + tuple(params)
 
 def make_conjunction_clause(fields, values,
-                            extra='', extra_params=tuple()):
+                            extra='', extra_params=tuple(),
+                            cmp_op="="):
     "Construct a conjunctive constraint clause with make_constraint_clause"
     return make_constraint_clause(" AND ", fields, values,
-                                  extra=extra, extra_params=extra_params)
+                                  extra=extra, extra_params=extra_params,
+                                  cmp_op=cmp_op)
 
 def make_disjunction_clause(fields, values,
-                            extra='', extra_params=tuple()):
+                            extra='', extra_params=tuple(),
+                            cmp_op="="):
     "Construct a disjunctive constraint clause with make_constraint_clause"
     return make_constraint_clause(" OR ", fields, values,
-                                  extra=extra, extra_params=extra_params)
+                                  extra=extra, extra_params=extra_params,
+                                  cmp_op=cmp_op)
 
 def add_where_clause(base_query, constraints):
     """Add a WHERE clause to a query if there are any constraints.
