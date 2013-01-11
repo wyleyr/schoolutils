@@ -429,7 +429,8 @@ class SimpleUI(BaseUI):
         header = formatter({'last_name': "Last name", 'first_name': "First name",
                             'email': "Email", 'sid': "SID"})
         students = self.edit_table(students, header, formatter,
-                                   editor=editor, creator=creator)
+                                   editor=editor, creator=creator,
+                                   deleter=lambda s: None)
 
         for s in students:
             try:
