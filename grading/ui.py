@@ -33,6 +33,28 @@ def require(attribute, callback, message):
 class SimpleUI(BaseUI):
     """Manages a simple (command line) user interface.
     """
+    STUDENT_FORMAT = '{last_name}, {first_name} (SID: {sid})'
+    COURSE_FORMAT = '{number}: {name} ({semester} {year})'
+    ASSIGNMENT_FORMAT = '' # TODO
+    GRADE_FORMAT = '' # TODO
+
+    def course_formatter(self, course_row):
+        "Format COURSE_FORMAT with course from db"
+        return self.COURSE_FORMAT.format(year=course_row[3], semester=course_row[4],
+                                         number=course_row[2], name=course_row[1])
+
+    def student_formatter(self, student_row):
+        "Format STUDENT_FORMAT with student from db"
+        return self.STUDENT_FORMAT.format(last_name=student_row[1],
+                                          first_name=student_row[2],
+                                          sid=student_row[3])
+
+    def assignment_formatter(self, assignment_row):
+        pass
+
+    def grade_formatter(self, grade_row):
+        pass
+   
     def __init__(self):
         self.db_file = None
         self.db_connection = None
@@ -125,11 +147,10 @@ class SimpleUI(BaseUI):
         courses = db.select_courses(self.db_connection,
                                     year=year, semester=semester,
                                     name=course_name, number=course_num)
-
-        course_to_str = lambda c: "{4} {3}: {2} {1}".format(*c)
+                                   
         if len(courses) == 1:
             course = courses[0]
-            print "Found 1 course; selecting: %s" % course_to_str(course)
+            print "Found 1 course; selecting: %s" % self.course_formatter(course)
             self.course_id = course[0]
         elif len(courses) == 0:
             print "No courses found matching those criteria; please try again."
@@ -137,9 +158,9 @@ class SimpleUI(BaseUI):
         else:
             course = self.options_menu(
                 "Multiple courses found; please select one:",
-                courses, course_to_str, allow_none=True)
+                courses, self.course_formatter, allow_none=True)
             if course:
-                print "Selected: %s" % course_to_str(course)
+                print "Selected: %s" % self.course_formatter(course)
                 self.course_id = course[0]
 
                 
