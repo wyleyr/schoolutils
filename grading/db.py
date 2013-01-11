@@ -85,8 +85,8 @@ def gradedb_init(db_connection):
 def insert_sample_data(db_connection):
     "Insert some sample data into a grade database"
     db_connection.executescript("""
-    INSERT INTO students VALUES (1, 'Richard', 'Lawrence', '21593500', 'richard.lawrence@berkeley.edu');
-    INSERT INTO students VALUES (2, 'Austin', 'Andrews', '12345678', 'austinandrews@berkeley.edu');
+    INSERT INTO students VALUES (1, 'Richard', 'Lawrence', '98765432', 'richard@example.com');
+    INSERT INTO students VALUES (2, 'Austin', 'Powers', '12345678', 'austin@example.com');
     INSERT INTO courses VALUES (1, 'Ancient philosophy', '25A', 2012, 'Fall');
     INSERT INTO courses VALUES (2, 'Introduction to logic', '12A', 2012, 'Spring');
     INSERT INTO course_memberships VALUES (1, 1, 1);
