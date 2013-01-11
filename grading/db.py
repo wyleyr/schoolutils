@@ -126,20 +126,31 @@ def gradedb_clear(db_connection):
 # basic CRUD operations and some convenience interfaces
 #
 def select_courses(db_connection, course_id=None, year=None, semester=None,
-                   name=None, number=None):
+                   name=None, number=None, student_id=None):
     """Return a result set of courses.
        Rows in the result set have the format:
        (id, name, number, year, semester)
     """
-    base_query = """
-    SELECT id, name, number, year, semester
-    FROM courses
-    %(where)s
-    """
+    if not student_id:
+        # don't perform a join without student information
+        base_query = """
+        SELECT id, name, number, year, semester
+        FROM courses
+        %(where)s
+        """
+    else:
+        base_query = """
+        SELECT courses.id, courses.name, courses.number, courses.year, courses.semester
+        FROM courses, course_memberships, students
+        ON (course_memberships.student_id=students.id AND
+            course_memberships.course_id=courses.id)
+        %(where)s
+        """
+        
     constraints, params = make_conjunction_clause(
         ['courses.id', 'courses.year', 'courses.semester', 'courses.name',
-         'courses.number'],
-        [course_id, year, semester, name, number])
+         'courses.number', 'students.id'],
+        [course_id, year, semester, name, number, student_id])
     query = add_where_clause(base_query, constraints)
     
     return db_connection.execute(query, params).fetchall()
