@@ -342,42 +342,47 @@ class SimpleUI(BaseUI):
         exit(0)
         
     # Helper methods:
-    def actions_menu(self, query, options, default=None, escape=None):
+    def actions_menu(self, query, actions, default=None, escape=None):
         """Present a menu of actions to the user.
            query should be a string to print before the list of actions.
            actions should be a sequence callables.
-           The docstring of each action is used to provide its menu entry.
+             The docstring of each action is used to provide its menu entry.
+           default, if provided, should be a callable to call if the user
+             makes no selection
            escape, if provided, should be a callable that returns the user
-           to a previous menu.
+             to a previous menu.
+           Returns the return value of the selected action.
         """
-        # TODO: roll this into options_menu or vice versa?
+        # TODO: add support for arguments to actions?
+             
         if escape:
-            options = list(options) + [escape]
+            actions = list(actions) + [escape]
         
-        menu_format = "{0:>3d}: {1: <30} {2: <40}" #"%d: %s\t\t%s"
+        menu_format = "{0:>3d}: {1: <30} {2: <40}"
         short_descs = []
         long_descs = []
-        for o in options:
-            lines = o.__doc__.splitlines()
+        for a in actions:
+            lines = a.__doc__.splitlines()
             short_descs.append(lines[0])
             long_descs.append(' '.join([l.strip() for l in lines[1:]]))
 
         print ""
         print query
         print "Please select one of the following actions:"
-        for i, o in enumerate(options):
+        for i, a in enumerate(actions):
             print menu_format.format(i, short_descs[i], long_descs[i])
 
         if default is not None:
-            prompt = "Which action? (default %d): " % options.index(default)
+            prompt = "Which action? (default %d): " % actions.index(default)
         else:
             prompt = "Which action? (enter a number): "
 
-        validator = lambda s: db.int_in_range(s, 0, len(options))
-        i = typed_input(prompt, validator, default=default)
+        validator = lambda s: db.int_in_range(s, 0, len(actions))
+        i = typed_input(prompt, validator,
+                        default=actions.index(default) if default in actions else None)
         print "" # visually separate menu and selection 
         
-        return options[i]()
+        return actions[i]()
 
     def options_menu(self, query, options, formatter,
                      escape=None, allow_none=False):
