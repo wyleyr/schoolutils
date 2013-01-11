@@ -543,49 +543,108 @@ class SimpleUI(BaseUI):
          else:
              print "No current database connection"
 
-    def get_student(self):
+    def get_student(self, create=False):
         """Lookup a student in the database, trying several methods.
-           Create a new student if none exists; return student row"""
+           If create is True, allow (and offer) creating a new student using
+             entered criteria if none exists.
+           Returns student row.
+        """
         student = None
         first_name = ''
         last_name = ''
         sid = ''
-        
-        try:
-            sid = typed_input("Enter SID: ", db.sid, default='')
-            student_id = db.get_student_id(self.db_connection, sid=sid)
-        except db.GradeDBException: # either 0 or multiple records found
-            last_name = typed_input("Enter last name: ", db.name, default='')
-            first_name = typed_input("Enter first name: ", db.name, default='')
+        email = ''
 
-        students = db.select_students(self.db_connection,
-                                      last_name=last_name,
-                                      first_name=first_name,
-                                      sid=sid,
-                                      course_id=self.course_id,
-                                      fuzzy=True)
+        # Helpers
+        class UniqueFound(Exception):
+            # dummy class for flow control
+            pass
         
-        if len(students) == 0:
-            create = typed_input("No student found; create? (Y/N) ", yn_bool)
-            if create:
-                student_id = db.create_student(self.db_connection,
-                                               first_name=first_name,
-                                               last_name=last_name,
-                                               sid=sid)
-                student = db.select_students(self.db_connection,
-                                             student_id=student_id)
+        def quit_if_unique(students):
+            "Stop searching if a unique student has been located"
+            if len(students) == 1:
+                raise UniqueFound
             else:
-                print "Could not locate student with these criteria; try again."
-                return self.get_student()
-        elif len(students) > 1:
-            student = self.options_menu(
-                "Which student did you mean?",
+                print "%d students found." % len(students)
+                
+        def students_menu(students):
+            "Select a student (or None) from a menu"
+            return self.options_menu(
+                "Select a student:",
                 students, 
-                lambda s: "{1}, {2} ({3})".format(*s))
-        else:
-            student = students[0]
+                lambda s: "{1}, {2} (SID: {3})".format(*s),
+                allow_none=create)
+               
+        students = []
+        try:
+            print ("Enter student data to lookup student. "
+                   "Search uses fuzzy matching on name and email fields.\n"
+                   "Use Ctrl-C to stop search and select from list.")
+            sid = typed_input("Enter SID: ", db.sid, default='')
+            students = db.select_students(self.db_connection, sid=sid)
+            quit_if_unique(students)
+
+            last_name = typed_input("Enter last name: ", db.name, default='')
+            students = db.select_students(self.db_connection,
+                                          sid=sid,
+                                          last_name=last_name,
+                                          fuzzy=True)
+            quit_if_unique(students)
             
+            first_name = typed_input("Enter first name: ", db.name, default='')
+            students = db.select_students(self.db_connection,
+                                          sid=sid,
+                                          last_name=last_name,
+                                          first_name=first_name,
+                                          fuzzy=True)
+            quit_if_unique(students)
+
+            email = typed_input("Enter email: ", db.email, default='')
+            students = db.select_students(self.db_connection,
+                                          sid=sid,
+                                          last_name=last_name,
+                                          first_name=first_name,
+                                          email=email,
+                                          fuzzy=True)
+            quit_if_unique(students)
+
+        except UniqueFound:
+            if create:
+                # edge case: unique student found, but user may still
+                # want to add a new one
+                student = students_menu(students)
+            else:
+                student = students[0]
+            
+        except KeyboardInterrupt:
+            student = students_menu(students)
+            
+        if student:
+            pass
+        elif create and typed_input("No student found; create? (Y/N) ", yn_bool):
+            # give user a chance to update values they provided and provide values
+            # they didn't enter
+            vals = {'last_name': last_name, 'first_name': first_name,
+                    'SID': sid, 'email': email}
+            validators = {'last_name': db.name, 'first_name': db.name,
+                          'SID': db.sid, 'email': db.email}
+            print "Please provide data for the student to be created:"
+            vals = self.edit_dict(vals, validators=validators)
+            
+            student_id = db.create_student(self.db_connection,
+                                           first_name=vals['first_name'],
+                                           last_name=vals['last_name'],
+                                           sid=vals['SID'],
+                                           email=vals['email'])
+            student = db.select_students(self.db_connection,
+                                         student_id=student_id)[0]
+        else:
+            print "Could not locate student with these criteria; please try again."
+            return self.get_student(create=create)
+
+        print "Selected: {1}, {2} (SID: {3})".format(*student)
         return student
+        
             
 #
 # Utilities
