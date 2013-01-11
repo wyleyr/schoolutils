@@ -238,8 +238,6 @@ class SimpleUI(BaseUI):
         while True:
             try:
                 student_id, last_name, first_name, sid, _ = self.get_student()
-                print "Selected: {0}, {1} (sid: {2})".format(
-                    last_name, first_name, sid)
                 grade_id = None
                 grade_val = typed_input("Enter grade value: ", str)
                 existing_grades = db.select_grades(self.db_connection,
