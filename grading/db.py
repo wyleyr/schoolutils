@@ -28,19 +28,21 @@ class MultipleRecordsFound(GradeDBException):
 
 def gradedb_init(db_connection):
     """Create a new SQLite database for storing grades.
-       Creates a database in file named by fname with tables:
-         students (id, first_name, last_name, sid)
+       Creates a database with tables:
+         students (id, first_name, last_name, sid, email)
          courses (id, name, number, year, semester)
          course_memberships (id, student_id, course_id)
          assignments (id, course_id, name, description, due_date, grade_type, points, weight)
          grades (id, assignment_id, student_id, value, timestamp)
+       db_connection should be a sqlite database connection.
     """
     db_connection.executescript("""
     CREATE TABLE students (
       id INTEGER PRIMARY KEY,
       first_name TEXT,
       last_name TEXT,
-      sid TEXT UNIQUE
+      sid TEXT UNIQUE,
+      email TEXT
     );
     CREATE TABLE courses (
       id INTEGER PRIMARY KEY,
@@ -54,7 +56,8 @@ def gradedb_init(db_connection):
       student_id INTEGER NOT NULL,
       course_id INTEGER NOT NULL,
       FOREIGN KEY(student_id) REFERENCES students(id),
-      FOREIGN KEY(course_id) REFERENCES courses(id)
+      FOREIGN KEY(course_id) REFERENCES courses(id),
+      UNIQUE(student_id, course_id) ON CONFLICT IGNORE
     );
     CREATE TABLE assignments (
       id INTEGER PRIMARY KEY,
@@ -82,8 +85,8 @@ def gradedb_init(db_connection):
 def insert_sample_data(db_connection):
     "Insert some sample data into a grade database"
     db_connection.executescript("""
-    INSERT INTO students VALUES (1, 'Richard', 'Lawrence', '21593500');
-    INSERT INTO students VALUES (2, 'Austin', 'Andrews', '12345678');
+    INSERT INTO students VALUES (1, 'Richard', 'Lawrence', '98765432', 'richard@example.com');
+    INSERT INTO students VALUES (2, 'Austin', 'Powers', '12345678', 'austin@example.com');
     INSERT INTO courses VALUES (1, 'Ancient philosophy', '25A', 2012, 'Fall');
     INSERT INTO courses VALUES (2, 'Introduction to logic', '12A', 2012, 'Spring');
     INSERT INTO course_memberships VALUES (1, 1, 1);
@@ -122,51 +125,68 @@ def gradedb_clear(db_connection):
 #
 # basic CRUD operations and some convenience interfaces
 #
-def select_courses(db_connection, year=None, semester=None, name=None, number=None):
+def select_courses(db_connection, course_id=None, year=None, semester=None,
+                   name=None, number=None, student_id=None):
     """Return a result set of courses.
        Rows in the result set have the format:
        (id, name, number, year, semester)
     """
-    base_query = """
-    SELECT id, name, number, year, semester
-    FROM courses
-    %(where)s
-    """
-    constraints, params = \
-        make_conjunction_clause(['courses.year', 'courses.semester', 'courses.name', 'courses.number'],
-                                [year, semester, name, number])
+    if not student_id:
+        # don't perform a join without student information
+        base_query = """
+        SELECT id, name, number, year, semester
+        FROM courses
+        %(where)s
+        """
+    else:
+        base_query = """
+        SELECT courses.id, courses.name, courses.number, courses.year, courses.semester
+        FROM courses, course_memberships, students
+        ON (course_memberships.student_id=students.id AND
+            course_memberships.course_id=courses.id)
+        %(where)s
+        """
+        
+    constraints, params = make_conjunction_clause(
+        ['courses.id', 'courses.year', 'courses.semester', 'courses.name',
+         'courses.number', 'students.id'],
+        [course_id, year, semester, name, number, student_id])
     query = add_where_clause(base_query, constraints)
     
     return db_connection.execute(query, params).fetchall()
 
-def create_course(db_connection, year=None, semester=None, name=None, number=None):
+def create_course(db_connection, year=None, semester=None, name=None,
+                  number=None):
     """Create a new course in the database.
        Returns the id of the inserted row.
     """
     base_query = """
     INSERT INTO courses (%(fields)s) VALUES (%(places)s);
     """
-    fields, places, params = make_values_clause(['year', 'semester', 'name', 'number'],
-                                                   [year, semester, name, number])
+    fields, places, params = make_values_clause(
+        ['year', 'semester', 'name', 'number'],
+        [year, semester, name, number])
     query = base_query % {'fields': fields, 'places': places}
     db_connection.execute(query, params)
 
     return last_insert_rowid(db_connection)
     
-def select_assignments(db_connection, course_id=None, year=None, semester=None, name=None):
+def select_assignments(db_connection, assignment_id=None, course_id=None,
+                       year=None, semester=None, name=None):
     """Return a result set of assignments.
        The rows in the result set have the format:
-       (assignment_id, course_id, assignment_name)
+       (assignment_id, course_id, assignment_name, due_date)
     """
     base_query = """
-    SELECT assignments.id, courses.id, assignments.name
+    SELECT assignments.id, courses.id, assignments.name, assignments.due_date
     FROM assignments, courses
     ON assignments.course_id=courses.id
     %(where)s
     """
     constraints, params = make_conjunction_clause(
-        ['courses.year', 'courses.semester', 'courses.id', 'assignments.name'],
-        [year, semester, course_id, name])
+        ['assignments.id', 'courses.year', 'courses.semester',
+         'courses.id', 'assignments.name'],
+        [assignment_id, year, semester, course_id, name])
     query = add_where_clause(base_query, constraints)
     
     return db_connection.execute(query, params).fetchall()
@@ -187,30 +207,67 @@ def create_assignment(db_connection, course_id=None, name=None, description=None
 
     return last_insert_rowid(db_connection)
   
-def select_students(db_connection, year=None, semester=None, course_id=None,
-                    course_name=None, last_name=None, first_name=None, sid=None):
+def select_students(db_connection, student_id=None, year=None, semester=None,
+                    course_id=None, course_name=None, last_name=None,
+                    first_name=None, sid=None, email=None,
+                    fuzzy=False):
     """Return a result set of students.
        The rows in the result set have the format:
-       (student_id, last_name, first_name, sid)
+       (student_id, last_name, first_name, sid, email)
+       If fuzzy is True, this function will use SQLite's LIKE clause to perform 
+         case-insensitive fuzzy matching on last_name, first_name, email, and
+         course_name fields 
     """
-    base_query = """
-    SELECT students.id, students.last_name, students.first_name, students.sid
-    FROM students, course_memberships, courses
-    ON course_memberships.student_id=students.id AND
-       course_memberships.course_id=courses.id
-    %(where)s
-    """
-    fields = ['courses.year', 'courses.semester', 'courses.id', 'courses.name',
-              'students.last_name', 'students.first_name', 'students.sid']
-    vals = [year, semester, course_id, course_name, last_name, first_name, sid]
-    constraints, params = make_conjunction_clause(fields, vals)
+    if course_id or course_name: 
+        base_query = """
+        SELECT students.id, students.last_name, students.first_name,
+               students.sid, students.email
+        FROM students, course_memberships, courses
+        ON (course_memberships.student_id=students.id AND
+            course_memberships.course_id=courses.id)
+        %(where)s
+        """
+    else:
+        # don't perform a join without any course information to constrain the query:
+        # that leads to duplicate results! (and it's slower)
+        base_query = """
+        SELECT students.id, students.last_name, students.first_name,
+               students.sid, students.email
+        FROM students
+        %(where)s
+        """
+
+    exact_fields = ['courses.year', 'courses.semester', 'courses.id',
+                    'students.id', 'students.sid']
+    exact_vals = [year, semester, course_id, student_id, sid]
+    fuzzy_fields = ['students.last_name', 'students.first_name', 'students.email',
+                    'courses.name']
+    fuzzy_vals = [last_name, first_name, email, course_name]
+       
+    if not fuzzy:
+        exact_fields = exact_fields + fuzzy_fields
+        exact_vals = exact_vals + fuzzy_vals
+        fuzzy_fields = fuzzy_vals = []
+    else:    
+        # for now, just assume that we should glob on both left and
+        # right of every field with a LIKE constraint
+        add_glob = lambda s: '%' + s + '%' if s else s
+        fuzzy_vals = [add_glob(v) for v in fuzzy_vals]
+        
+    constraints, params = make_conjunction_clause(exact_fields, exact_vals)
+    constraints, params = make_conjunction_clause(fuzzy_fields, fuzzy_vals,
+                                                  extra=constraints,
+                                                  extra_params=params,
+                                                  cmp_op="LIKE")
+
     query = add_where_clause(base_query, constraints)
     
     return db_connection.execute(query, params).fetchall()
 
-def get_student_id(db_connection, first_name='', last_name='', sid=''):
+def get_student_id(db_connection, first_name=None, last_name=None,
+                   sid=None, email=None):
     """Find a student in the grade database.
-       Searches by (last_name, first_name) OR sid.
+       Searches by (last_name, first_name) OR sid OR email.
        Return the student's id if found uniquely.
     """
     base_query = """
@@ -222,18 +279,21 @@ def get_student_id(db_connection, first_name='', last_name='', sid=''):
         ['first_name', 'last_name'],
         [first_name, last_name])
     constraints, params = make_disjunction_clause(
-        ['sid'],
-        [sid],
+        ['sid', 'email'],
+        [sid, email],
         extra=name_constraints, extra_params=name_params)
 
     query = add_where_clause(base_query, constraints)
     
     rows = db_connection.execute(query, params).fetchall()
 
-    return ensure_unique(rows, err_msg="get_student_id expects to find exactly 1 student",
-                         query=query, params=params)
+    return ensure_unique(
+        rows,
+        err_msg="get_student_id expects to find exactly 1 student",
+        query=query, params=params)
     
-def create_student(db_connection, first_name=None, last_name=None, sid=None):
+def create_student(db_connection, first_name=None, last_name=None, sid=None,
+                   email=None):
     """Create a new student in the database.
        Returns the id of the inserted row.
     """
@@ -241,14 +301,15 @@ def create_student(db_connection, first_name=None, last_name=None, sid=None):
     INSERT INTO students (%(fields)s) VALUES (%(places)s);
     """
     fields, places, params = make_values_clause(
-        ['first_name', 'last_name', 'sid']
-        [first_name, last_name, sid])
+        ['first_name', 'last_name', 'sid', 'email'],
+        [first_name, last_name, sid, email])
     query = base_query % {'fields': fields, 'places': places}
     db_connection.execute(query, params)
 
     return last_insert_rowid(db_connection)
 
-def update_student(db_connection, student_id=None, last_name=None, first_name=None, sid=None):
+def update_student(db_connection, student_id=None, last_name=None,
+                   first_name=None, sid=None, email=None):
     """Update a record of an existing student.
     
        If student_id is not provided, this function attempts to find a
@@ -259,15 +320,15 @@ def update_student(db_connection, student_id=None, last_name=None, first_name=No
        data with a NULL value.)  Returns the id of the updated row.
     """
     if not student_id:
-        student_id = get_student_id(db_connection,
-                                    last_name=last_name, first_name=first_name, sid=sid)
+        student_id = get_student_id(
+            db_connection,
+            last_name=last_name, first_name=first_name, sid=sid)
 
-    fields = ['last_name', 'first_name', 'sid']
+    fields = ['last_name', 'first_name', 'sid', 'email']
     old_values = db_connection.execute(
         "SELECT %s FROM students WHERE id=?" % ', '.join(fields),
-        (student_id,)
-    ).fetchone()
-    new_values = [last_name, first_name, sid]
+        (student_id,)).fetchone()
+    new_values = [last_name, first_name, sid, email]
     update_values = overlay(old_values, new_values)
     
     base_query = """
@@ -282,10 +343,49 @@ def update_student(db_connection, student_id=None, last_name=None, first_name=No
     
     return student_id
 
-def create_or_update_student():
-    # Do I need this function?  Should the logic be in Python, or should I use INSERT OR REPLACE?
-    raise NotImplementedError
+def create_or_update_student(db_connection, student_id=None, last_name=None,
+                             first_name=None, sid=None, email=None):
+    """Create a new student or update a record of an existing student.
+       Returns the id of the created or updated row.
 
+       WARNING: This function uses SQLite's INSERT OR REPLACE
+       statement rather than an UPDATE statement.  If you pass
+       student_id or sid, it *will* erase data in an existing row of
+       the students table on a conflict; you must provide all values
+       to replace the existing data.
+    """
+    base_query = """
+    INSERT OR REPLACE INTO students (%(fields)s) VALUES (%(places)s);
+    """
+    fields, places, params = make_values_clause(
+        ['id', 'last_name', 'first_name', 'sid', 'email'],
+        [student_id, last_name, first_name, sid, email])    
+    
+    query = base_query % {'fields': fields, 'places': places}
+    db_connection.execute(query, params)
+    
+    return last_insert_rowid(db_connection)
+
+def select_course_memberships(db_connection, member_id=None, course_id=None,
+                              student_id=None):
+    """Return a result set of course memberships.
+       The rows in the result set have the format:
+         (course_membership_id, course_id, student_id)
+       For joins with students or courses table, see select_students and
+         select_courses.
+    """
+    base_query = """
+    SELECT id, course_id, student_id
+    FROM course_memberships
+    %(where)s
+    """
+    constraints, params = make_conjunction_clause(
+        ['id', 'course_id', 'student_id'],
+        [member_id, course_id, student_id])
+    query = add_where_clause(base_query, constraints)
+
+    return db_connection.execute(query, params).fetchall()
+    
 def create_course_member(db_connection, course_id=None, student_id=None):
     """Create a new course_membership record in the database.
        Returns the id of the inserted row.
@@ -301,22 +401,85 @@ def create_course_member(db_connection, course_id=None, student_id=None):
 
     return last_insert_rowid(db_connection)
 
-def select_grades(db_connection, student_id=None, course_id=None, assignment_id=None):
+def delete_course_member(db_connection, member_id=None, course_id=None,
+                         student_id=None):
+    """Delete a course_membership record in the database.
+       Deletes any row from course_memberships where either:
+         id = member_id, OR
+         (course_id = course_id AND student_id = student_id)
+       You must pass either member_id or both course_id and student_id;
+         this function refuses to delete multiple rows.
+       To delete multiple rows, see delete_course_members.
+       Returns the number of deleted rows (which should not exceed 1).
+    """
+    # sanity check:
+    if not (member_id or (student_id and course_id)):
+        raise sqlite3.IntegrityError(
+            "delete_course_member requires either member_id or BOTH "
+            "student_id and course_id")
+
+    base_query = """
+    DELETE FROM course_memberships
+    %(where)s;
+    """
+    constraints, params = make_conjunction_clause(
+        ['course_id', 'student_id'],
+        [course_id, student_id])
+    constraints, params = make_disjunction_clause(
+        ['id'], [member_id],
+        extra=constraints, extra_params=params)
+    query = add_where_clause(base_query, constraints)
+
+    db_connection.execute(query, params)
+    return num_changes(db_connection)
+
+def delete_course_members(db_connection, member_id=None, course_id=None,
+                          student_id=None):
+    """Delete one or more course_membership records in the database.
+       Deletes any row matching the conjunction of the given criteria.
+       Refuses to delete rows if no constraints are provided; if you
+         wish to delete all rows in the table, use a custom
+         DELETE FROM or DROP TABLE statement.
+       Returns the number of deleted rows.
+    """
+    # sanity check:
+    if not (member_id or course_id or student_id):
+        raise sqlite3.IntegrityError(
+            "delete_course_members will not delete all rows in the "
+            "course_memberships table")
+    
+    base_query = """
+    DELETE FROM course_memberships
+    %(where)s;
+    """
+    constraints, params = make_conjunction_clause(
+        ['id', 'course_id', 'student_id'],
+        [member_id, course_id, student_id])
+    query = add_where_clause(base_query, constraints)
+
+    db_connection.execute(query, params)
+
+    return num_changes(db_connection)
+    
+def select_grades(db_connection, student_id=None, course_id=None,
+                  assignment_id=None):
     """Get a result set of grades for a given student or course.
        The rows in the result set have the format:
-       (grade_id, student_id, course_id, assignment_id, assignment_name, grade_value)
+       (grade_id, student_id, course_id, assignment_id, assignment_name,
+         grade_value)
        course_id may be supplied to limit results to one course.
     """
     base_query = """
-    SELECT grades.id, students.id, assignments.course_id, assignments.id, assignments.name, grades.value
+    SELECT grades.id, students.id, assignments.course_id, assignments.id,
+           assignments.name, grades.value
     FROM grades, assignments, students
     ON grades.assignment_id=assignments.id AND grades.student_id=students.id
     %(where)s
     """
      
-    constraints, params = \
-        make_conjunction_clause(['students.id', 'assignments.course_id', 'assignments.id'],
-                                [student_id, course_id, assignment_id])
+    constraints, params = make_conjunction_clause(
+        ['students.id', 'assignments.course_id', 'assignments.id'],
+        [student_id, course_id, assignment_id])
     query = add_where_clause(base_query, constraints)
    
     return db_connection.execute(query, params).fetchall()
@@ -341,10 +504,11 @@ def create_grade(db_connection, assignment_id=None, student_id=None, value=None,
 
     return last_insert_rowid(db_connection)
 
-def create_or_update_grade(db_connection, grade_id=None, assignment_id=None, student_id=None,
-                           value=None, timestamp=None):
+def create_or_update_grade(db_connection, grade_id=None, assignment_id=None,
+                           student_id=None, value=None, timestamp=None):
     """Create a new grade or update a record of an existing grade.
        Returns the id of the created or updated row.
+       
        WARNING: This function uses SQLite's INSERT OR REPLACE
        statement rather than an UPDATE statement.  If you pass
        grade_id, it *will* erase data in an existing row of the grades
@@ -380,7 +544,8 @@ class GradeDict(dict):
     def __init__(self, rows):
         """Initialize with a set of database rows.
            Each row should be formatted like:
-           (grade_id, student_id, course_id, assignment_id, assignment_name, grade_value)
+           (grade_id, student_id, course_id, assignment_id, assignment_name,
+             grade_value)
            as e.g. produced by select_grades
         """
         # a single, unique student_id is necessary so that we can
@@ -420,7 +585,8 @@ class GradeDict(dict):
         else:
             # grade_id and assignment_id not available;
             # they must be supplied at save time
-            self._grades[key] = [None, self.student_id, self.course_id, None, key, val]
+            self._grades[key] = [None, self.student_id, self.course_id, None,
+                                 key, val]
 
     def __iter__(self):
         return self.keys()
@@ -449,20 +615,28 @@ class GradeDict(dict):
         """
         # TODO: transaction management here?
         ids = []
-        for grade_id, student_id, course_id, assignment_id, assignment_name, grade_val \
-                in self._grades.values():
+        for grade_id, student_id, course_id, assignment_id, assignment_name, \
+                grade_val in self._grades.values():
             if not assignment_id:
                 try:
                     assignment_id = ensure_unique(
-                        select_assignments(db_connection, course_id=course_id, name=assignment_name))
+                        select_assignments(db_connection, course_id=course_id,
+                                           name=assignment_name))
                 except NoRecordsFound:
-                    desc = "Assignment row generated automatically by GradeDict.save()"
-                    assignment_id = create_assignment(db_connection, course_id=course_id,
-                                                      name=assignment_name, description=desc)
+                    desc = "Assignment row generated automatically by GradeDict"
+                    assignment_id = create_assignment(
+                        db_connection,
+                        course_id=course_id,
+                        name=assignment_name,
+                        description=desc)
                 # MultipleRecordsFound exception should propagate
 
-            row_id = create_or_update_grade(db_connection, grade_id=grade_id, student_id=student_id,
-                                            assignment_id=assignment_id, value=grade_val)
+            row_id = create_or_update_grade(
+                db_connection,
+                grade_id=grade_id,
+                student_id=student_id,
+                assignment_id=assignment_id,
+                value=grade_val)
             ids.append(row_id)
 
         return ids
@@ -495,7 +669,8 @@ def overlay(old_values, new_values):
     return overlaid_vals
 
 def make_constraint_clause(connective, fields, values,
-                           extra='', extra_params=tuple()):
+                           extra='', extra_params=tuple(),
+                           cmp_op="="):
     """Construct a constraint clause and a set of parameters for it.
        Returns a tuple of the constaint clause as a string and the
        parameter values as a tuple.
@@ -505,32 +680,42 @@ def make_constraint_clause(connective, fields, values,
        a tuple of parameters to prepend to the generated parameters.
        Using these arguments, one can incrementally construct complex
        constraints, e.g. "(field1=? AND field2=?) OR field3=?"
+
+       cmp_op, if provided, should be a string specifying a binary
+       comparison operator.  The default is "="; "!=", "LIKE" etc.
+       are other useful options.  Spaces are automatically added on
+       either side and a parameter place '?' is added to the right
+       hand side
     """
     constraints = []
     params = []
     for f, v in zip(fields, values):
         if v:
-            constraints.append(f + "=?")
+            constraints.append(f + " " + cmp_op + " ?")
             params.append(v)
 
     if extra:
-        constraints.insert(0, "(" + extra +")")
+        constraints.insert(0, "(" + extra + ")")
         
     clause = connective.join(constraints)
     
     return clause, tuple(extra_params) + tuple(params)
 
 def make_conjunction_clause(fields, values,
-                            extra='', extra_params=tuple()):
+                            extra='', extra_params=tuple(),
+                            cmp_op="="):
     "Construct a conjunctive constraint clause with make_constraint_clause"
     return make_constraint_clause(" AND ", fields, values,
-                                  extra=extra, extra_params=extra_params)
+                                  extra=extra, extra_params=extra_params,
+                                  cmp_op=cmp_op)
 
 def make_disjunction_clause(fields, values,
-                            extra='', extra_params=tuple()):
+                            extra='', extra_params=tuple(),
+                            cmp_op="="):
     "Construct a disjunctive constraint clause with make_constraint_clause"
     return make_constraint_clause(" OR ", fields, values,
-                                  extra=extra, extra_params=extra_params)
+                                  extra=extra, extra_params=extra_params,
+                                  cmp_op=cmp_op)
 
 def add_where_clause(base_query, constraints):
     """Add a WHERE clause to a query if there are any constraints.
@@ -563,4 +748,100 @@ def make_values_clause(fields, values):
 
 def last_insert_rowid(db_connection):
     "Returns the id of the last inserted row"
-    return ensure_unique(db_connection.execute("SELECT last_insert_rowid()").fetchall())
+    return ensure_unique(
+        db_connection.execute("SELECT last_insert_rowid()").fetchall())
+
+def num_changes(db_connection):
+    "Returns the number of rows affected by the last INSERT, UPDATE, or DELETE"
+    return ensure_unique(
+        db_connection.execute("SELECT changes()").fetchall())
+
+#
+# Constructors/validators
+#
+def number_in_range(s, constructor, mn, mx):
+    """Convert s to a number and validate that it occurs in a given range.
+       Min bound is inclusive; max bound is exclusive."""
+    n = constructor(s)
+    if not (mn <= n and n < mx):
+        raise ValueError("Number %s outside acceptable range [%s, %s)" %
+                         (n, mn, mx))
+    return n
+
+def int_in_range(s, mn, mx):
+    return number_in_range(s, int, mn, mx)
+
+def float_in_range(s, mn, mx):
+    return number_in_range(s, float, mn, mx)
+
+def year(s):
+    "Convert s to a calendar year"
+    return int_in_range(s, 1985, 2100)
+
+def month(s):
+    "Convert s to a calendar month"
+    return int_in_range(s, 1, 13)
+
+def day(s):
+    "Convert s to a calendar day"
+    return int_in_range(s, 1, 32)
+
+def semester(s):
+    "Convert s to a semester-designating string"
+    S = s.strip().title()
+    if S not in ['Fall', 'Spring', 'Summer']:
+        raise ValueError("Not a semester designation: %s" % s)
+    return S
+
+def percentage_grade(s):
+    "Convert s to a percentage grade"
+    return float_in_range(s, 0, 100.1)
+
+def four_point_grade(s):
+    "Convert s to a grade on a 4.0 scale"
+    return float_in_range(s, 0.0, 4.0)
+
+def letter_grade(s):
+    "Ensure s is a letter grade"
+    letter_grades = [
+        'A+', 'A', 'A-',
+        'B+', 'B', 'B-',
+        'C+', 'C', 'C-',
+        'D+', 'D', 'D-',
+        'F', 'I'
+    ]
+    g = s.strip().upper()
+    if g not in letter_grades:
+        raise ValueError("Not a letter grade: %s" % s)
+    return g
+    
+def date(s):
+    """Convert s to a datetime.date.
+       s is assumed to be in YYYY-MM-DD format"""
+    y, m, d = s.strip().split('-')
+    y = year(y)
+    m = month(m)
+    d = day(m)
+    return datetime.date(y, m, d)
+
+def sid(s):
+    """Ensure s is a valid Berkeley SID"""
+    sid = s.strip()
+    if len(sid) != 8:
+        raise ValueError("SID must be 8 digits long")
+    for digit in sid:
+        if digit not in '0123456789':
+            raise ValueError("Non-numeric digit in SID: %s" % digit)
+    else:
+        return sid
+
+def name(s):
+    """Ensure s looks like a name"""
+    return s.strip().upper()
+
+def email(s):
+    """Ensure s looks like an email address"""
+    e = s.lower()
+    if '@' not in e:
+        raise ValueError("%s does not appear to be an email address" % s)
+    return e
