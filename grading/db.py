@@ -417,6 +417,7 @@ def create_or_update_grade(db_connection, grade_id=None, assignment_id=None,
                            student_id=None, value=None, timestamp=None):
     """Create a new grade or update a record of an existing grade.
        Returns the id of the created or updated row.
+       
        WARNING: This function uses SQLite's INSERT OR REPLACE
        statement rather than an UPDATE statement.  If you pass
        grade_id, it *will* erase data in an existing row of the grades
