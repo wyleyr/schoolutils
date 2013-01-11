@@ -558,35 +558,32 @@ class SimpleUI(BaseUI):
             last_name = typed_input("Enter last name: ", db.name, default='')
             first_name = typed_input("Enter first name: ", db.name, default='')
 
-        try:
-            # TODO? we can end up returning students who are not members of the
-            # current course; offer to add them...
-            student_id = db.get_student_id(self.db_connection,
-                                           last_name=last_name,
-                                           first_name=first_name,
-                                           sid=sid)
-        except db.NoRecordsFound:
+        students = db.select_students(self.db_connection,
+                                      last_name=last_name,
+                                      first_name=first_name,
+                                      sid=sid,
+                                      course_id=self.course_id,
+                                      fuzzy=True)
+        
+        if len(students) == 0:
             create = typed_input("No student found; create? (Y/N) ", yn_bool)
             if create:
-                student_id = db.create_student(
-                    first_name=first_name, last_name=last_name, sid=sid)
+                student_id = db.create_student(self.db_connection,
+                                               first_name=first_name,
+                                               last_name=last_name,
+                                               sid=sid)
+                student = db.select_students(self.db_connection,
+                                             student_id=student_id)
             else:
                 print "Could not locate student with these criteria; try again."
                 return self.get_student()
-        except db.MultipleRecordsFound:
-            students = db.select_students(self.db_connection,
-                                          last_name=last_name,
-                                          first_name=first_name,
-                                          course_id=self.course_id,
-                                          sid=sid)
+        elif len(students) > 1:
             student = self.options_menu(
                 "Which student did you mean?",
                 students, 
                 lambda s: "{1}, {2} ({3})".format(*s))
-            student_id = student[0]
-
-        if not student:
-            student = db.select_students(self.db_connection, student_id=student_id)[0]
+        else:
+            student = students[0]
             
         return student
             
