@@ -218,6 +218,7 @@ class SimpleUI(BaseUI):
                  self.change_course,
                  self.change_assignment,
                  self.import_students,
+                 self.edit_student,
                  self.enter_grades,
                  #self.calculate_grades,
                  #self.import_grades,
@@ -452,7 +453,90 @@ class SimpleUI(BaseUI):
                 course_id=self.course_id)
 
         print "%d students imported successfully." % len(students)
+
+    @require('db_connection', change_database,
+             "A database connection is required to edit students.")
+    def edit_student(self):
+        """Add or edit students.
+           Lookup students and modify their contact data and course memberships.
+        """
+        student = self.get_student(create=True)
+        self.actions_menu(
+            "What do you want to do?",
+            [self.edit_student_info, self.edit_student_courses])
             
+ 
+    @require('db_connection', change_database,
+             "A database connection is required to edit student information.")
+    @require('student_id', get_student,
+             "A selected student is required to edit student information.")
+    def edit_student_info(self):
+        """Edit student contact data.
+           Change name, SID, email, etc. for current student.
+        """
+        # TODO.  Need to figure out proper code sharing.
+        raise NotImplementedError
+        student = db.select_students(self.db_connection,
+                                     student_id=self.student_id)[0]
+        d = self.student_row_to_dict(student)
+        d = self.edit_dict(d, validators={'last_name': db.name,
+                                          'first_name': db.name,
+                                          'sid': db.sid,
+                                          'email': db.email})
+        
+        
+
+    @require('db_connection', change_database,
+             "A database connection is required to edit course memberships.")
+    @require('student_id', get_student,
+             "A selected student is required to edit course memberships.")
+    def edit_student_courses(self):
+        """Edit student courses.
+           Add or remove current student from courses.
+        """
+        student = db.select_students(self.db_connection,
+                                     student_id=self.student_id)[0]
+        
+        def add_to_course():
+            all_courses = db.select_courses(self.db_connection)
+            current_courses = db.select_courses(self.db_connection,
+                                                student_id=self.student_id)
+            options = filter(lambda c: c not in current_courses, all_courses)
+            course = self.options_menu(
+                "Which course should the student be added to?",
+                options,
+                self.course_formatter,
+                allow_none=True)
+            if course:
+                course_id = course[0]
+                db.create_course_member(self.db_connection,
+                                        student_id=self.student_id,
+                                        course_id=course_id)
+                print "Student added to %s" % self.course_formatter(course)
+            else:
+                print "Student not added to course."
+                
+            return course
+                
+        def remove_from_course(course):
+            course_id = course[0]
+            db.delete_course_member(self.db_connection,
+                                    student_id=self.student_id,
+                                    course_id=course_id)
+            print "Student deleted from %s" % self.course_formatter(course)
+
+        current_courses = db.select_courses(self.db_connection,
+                                            student_id=self.student_id)
+        self.edit_table(
+            current_courses,
+            "Current courses for %s" % self.student_formatter(student),
+            self.course_formatter,
+            creator=add_to_course,
+            deleter=remove_from_course)
+
+        print "Student course memberships updated."
+        
+
     def import_grades(self):
         pass
 
@@ -653,7 +737,6 @@ class SimpleUI(BaseUI):
                 d[k] = new_v
 
         return d
-            
         
     def print_course_info(self):
         "Prints information about the currently selected course"
