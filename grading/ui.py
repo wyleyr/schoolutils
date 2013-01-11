@@ -301,7 +301,8 @@ class SimpleUI(BaseUI):
                                          })
         header = formatter({'last_name': "Last name", 'first_name': "First name",
                             'email': "Email", 'sid': "SID"})
-        students = self.edit_table(students, header, formatter, editor, creator)
+        students = self.edit_table(students, header, formatter,
+                                   editor=editor, creator=creator)
 
         for s in students:
             try:
@@ -425,16 +426,19 @@ class SimpleUI(BaseUI):
         elif idx == none_option:
             return None
 
-    def edit_table(self, rows, header, formatter, editor, creator=None):
+    def edit_table(self, rows, header, formatter, editor=None,
+                   creator=None, deleter=None):
         """Present a simple interface for reviewing and editing tabular data.
            rows should be a sequence of values for the user to review and edit
            header should be a string to print above the table
            formatter should be a function which, given a row value, returns a
              string representing the row for display to the screen
-           editor should be a function which, given a row value, returns a
-             new row value based on user input
+           editor, if provided, should be a function which, given a row value,
+             returns a new row value based on user input
            creator, if provided, should be a function with no arguments which
              returns a new row value based on user input  
+           deleter, if provided, should be a function to call for its side
+             effects with the row value when the user deletes a row
            Returns the edited rows.
         """
         editable_rows = [r for r in rows]
@@ -461,21 +465,28 @@ class SimpleUI(BaseUI):
                     print row_format.format(index=i, frow=formatter(r))
 
                 print ""
-                prompt = ("Enter number to edit row (or Ctrl-C to end).\n"
-                          "Prefix row number with 'd' to delete")
+                prompt = "Press Ctrl-C to end.\n"
+                if editor:
+                    prompt += "Enter row # to edit. " 
                 if creator:
-                    prompt += "; enter 'i' to insert a new row: "
-                else:
-                    prompt += ": "
+                    prompt += "Enter 'i' to insert a new row. "
+                if deleter:
+                    prompt += "Prefix row # with 'd' to delete. "
+                prompt += "\nWhat do you want to do? "
                     
                 action, idx = typed_input(prompt, validator)
-                if action == 'e':
-                    editable_rows[idx] = editor(editable_rows[idx])
+                if action == 'e' and editor:
+                    new_row = editor(editable_rows[idx])
+                    if new_row: # editor might return None
+                        editable_rows[idx] = new_row
                 elif action == 'd':
-                    editable_rows.pop(idx)
+                    to_delete = editable_rows.pop(idx)
+                    if deleter:
+                        deleter(to_delete)
                 elif action == 'i' and creator: 
                     new_row = creator()
-                    editable_rows.append(new_row)
+                    if new_row: # creator might return None
+                        editable_rows.append(new_row)
 
             except KeyboardInterrupt:
                 print ""
