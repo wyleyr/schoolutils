@@ -28,12 +28,13 @@ class MultipleRecordsFound(GradeDBException):
 
 def gradedb_init(db_connection):
     """Create a new SQLite database for storing grades.
-       Creates a database in file named by fname with tables:
-         students (id, first_name, last_name, sid)
+       Creates a database with tables:
+         students (id, first_name, last_name, sid, email)
          courses (id, name, number, year, semester)
          course_memberships (id, student_id, course_id)
          assignments (id, course_id, name, description, due_date, grade_type, points, weight)
          grades (id, assignment_id, student_id, value, timestamp)
+       db_connection should be a sqlite database connection.
     """
     db_connection.executescript("""
     CREATE TABLE students (
