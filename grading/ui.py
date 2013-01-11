@@ -63,6 +63,7 @@ class SimpleUI(BaseUI):
         self.year = None
         self.course_id = None
         self.assignment_id = None
+        self.student_id = None
 
     # Top-level actions:
     def close_database(self):
@@ -76,6 +77,7 @@ class SimpleUI(BaseUI):
             # these fields will now be invalid, so erase them too:
             self.course_id = None
             self.assignment_id = None
+            self.student_id = None
 
             
     def change_database(self):
@@ -582,7 +584,7 @@ class SimpleUI(BaseUI):
         """Lookup a student in the database, trying several methods.
            If create is True, allow (and offer) creating a new student using
              entered criteria if none exists.
-           Returns student row.
+           Returns student row and sets self.student_id.
         """
         student = None
         first_name = ''
@@ -678,7 +680,9 @@ class SimpleUI(BaseUI):
             return self.get_student(create=create)
 
         print "Selected: {1}, {2} (SID: {3})".format(*student)
+        self.student_id = student[0]
         return student
+
         
             
 #
