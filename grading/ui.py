@@ -35,7 +35,7 @@ class SimpleUI(BaseUI):
     """
     STUDENT_FORMAT = '{last_name}, {first_name} (SID: {sid})'
     COURSE_FORMAT = '{number}: {name} ({semester} {year})'
-    ASSIGNMENT_FORMAT = '' # TODO
+    ASSIGNMENT_FORMAT = '{name} (due {due_date})'
     GRADE_FORMAT = '' # TODO
 
     def course_formatter(self, course_row):
@@ -50,7 +50,8 @@ class SimpleUI(BaseUI):
                                           sid=student_row[3])
 
     def assignment_formatter(self, assignment_row):
-        pass
+        return self.ASSIGNMENT_FORMAT.format(name=assignment_row[2],
+                                             due_date=assignment_row[3])
 
     def grade_formatter(self, grade_row):
         pass
@@ -308,7 +309,6 @@ class SimpleUI(BaseUI):
         """
         assignments = db.select_assignments(self.db_connection,
                                             course_id=self.course_id)
-        assignment_to_str = lambda a: "{2} (due {3})".format(*a)
         if len(assignments) == 0:
             create = typed_input(
                 "No assignments found for the current course.  Create? (Y/N) ",
@@ -320,7 +320,7 @@ class SimpleUI(BaseUI):
         else:
             assignment = self.options_menu(
                 "Select an assignment for this course:",
-                assignments, assignment_to_str,
+                assignments, self.assignment_formatter,
                 escape=self.create_assignment, allow_none=True)
             if assignment:
                 self.assignment_id = assignment[0]
@@ -751,22 +751,27 @@ class SimpleUI(BaseUI):
         "Prints information about the currently selected course"
         if self.course_id:
             course = db.select_courses(self.db_connection, course_id=self.course_id)[0]
-            print "Current course is %(num)s: %(name)s (%(sem)s %(year)s)" % {
-                'num': course[2],
-                'name': course[1],
-                'sem': course[4],
-                'year': course[3]}
+            print "Current course is: %s" % self.course_formatter(course) 
         else:
-            print "No current course"
+            print "No course selected"
            
     def print_assignment_info(self):
         "Prints information about the currently selected assignment"
         if self.assignment_id:
             assignment = db.select_assignments(self.db_connection,
                                                assignment_id=self.assignment_id)[0]
-            print "Current assignment is: %s" % assignment[2]
+            print "Current assignment is: %s" % self.assignment_formatter(assignment)
         else:
-            print "No current assignment"
+            print "No assignment selected"
+
+    def print_student_info(self):
+        "Prints information about the currently select student"
+        if self.student_id:
+            student = db.select_students(self.db_connection,
+                                         student_id=self.student_id)[0]
+            print "Current student is: %s" % self.student_formatter(student)
+        else:
+            print "No student selected"
 
     def print_db_info(self):
          "Prints information about the database connection"
