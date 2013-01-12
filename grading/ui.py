@@ -175,7 +175,10 @@ class SimpleUI(BaseUI):
                 student = students[0]
             
         except KeyboardInterrupt:
-            student = students_menu(students)
+            # don't bother with a selection menu if no students met all
+            # the search criteria at the time the user presses Ctrl-C
+            if students:
+                student = students_menu(students)
             
         if student:
             pass
