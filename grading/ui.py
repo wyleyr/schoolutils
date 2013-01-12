@@ -446,6 +446,7 @@ class SimpleUI(BaseUI):
            Lookup students and modify their contact data and course memberships.
         """
         student = self.get_student(create=True)
+            
         self.actions_menu(
             "What do you want to do?",
             [self.edit_student_info, self.edit_student_courses])
@@ -464,6 +465,7 @@ class SimpleUI(BaseUI):
         d = self.edit_student_dict(from_row=student)
         
         self.student_id = db.create_or_update_student(self.db_connection, **d)
+        print "Student information updated."
 
     @require('db_connection', change_database,
              "A database connection is required to edit course memberships.")
