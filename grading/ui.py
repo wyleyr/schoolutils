@@ -130,12 +130,12 @@ class SimpleUI(BaseUI):
             return self.options_menu(
                 "Select a student:",
                 students, 
-                lambda s: "{1}, {2} (SID: {3})".format(*s),
+                self.student_formatter,
                 allow_none=create)
                
         students = []
         try:
-            print ("Enter student data to lookup student. "
+            print ("Enter student data to lookup or create student. "
                    "Search uses fuzzy matching on name and email fields.\n"
                    "Use Ctrl-C to stop search and select from list.")
             sid = typed_input("Enter SID: ", db.sid, default='')
