@@ -8,6 +8,7 @@ setup(name='schoolutils',
       author='Richard Lawrence',
       author_email='richard.lawrence@berkeley.edu',
       license='GPLv2+',
-      packages=['schoolutils'],
+      packages=['schoolutils',
+                'schoolutils.grading'],
       #scripts=['bin/grade',],
       )
