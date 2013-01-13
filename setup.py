@@ -1,4 +1,4 @@
-from setuptools import setup
+from distutils.core import setup
 
 setup(name='schoolutils',
       version='0.1',
@@ -7,5 +7,4 @@ setup(name='schoolutils',
       author='Richard Lawrence',
       author_email='richard.lawrence@berkeley.edu',
       license='GPLv2+',
-      packages=['schoolutils'],
-      zip_safe=False)
+      packages=['schoolutils'],)
