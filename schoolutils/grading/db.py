@@ -799,7 +799,7 @@ def percentage_grade(s):
 
 def four_point_grade(s):
     "Convert s to a grade on a 4.0 scale"
-    return float_in_range(s, 0.0, 4.0)
+    return float_in_range(s, 0.0, 5.0)
 
 def letter_grade(s):
     "Ensure s is a letter grade"
