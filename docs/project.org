@@ -30,6 +30,8 @@
 ** TODO [#C] PGP encryption/decryption of database file		      :ui:db:
 ** TODO [#B] Export grades to gradebook format		   :bspace:ui:export:
 ** TODO [#C] distribute on PyPI 				  :packaging:
+   - need to remove/abstract out Berkeley-specific code, like
+     db.sid validator and bspace module
 ** TODO [#C] Interface for emailing grades, stats to students	  :ui:export:
 ** TODO [#C] Interface for creating mailing lists		  :ui:export:
 ** TODO [#A] System configuration			       :ui:packaging:
