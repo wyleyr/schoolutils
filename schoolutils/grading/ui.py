@@ -280,6 +280,7 @@ class SimpleUI(BaseUI):
         """Change current course.
            Select an existing course from the database, or add a new one.
         """
+        # TODO: add support for selecting from user_config.current_courses
         self.print_course_info()
         self.actions_menu("What do you want to do?",
                         [self.select_course,
@@ -441,6 +442,8 @@ class SimpleUI(BaseUI):
             except KeyboardInterrupt:
                 print ""
                 break
+            # TODO: shortcut here for changing to another assignment?
+            # enter_grades_for_student method? (for a single student across all course assignments)
 
     @require('db_connection', change_database,
              "A database connection is required to import students.")
@@ -687,6 +690,7 @@ class SimpleUI(BaseUI):
             max_index += 1
             print menu_format.format(max_index, escape.__doc__.splitlines()[0])
         if allow_none:
+            # TODO: something wrong with logic here; escape doesn't work
             none_option = max_index
             max_index += 1
             print menu_format.format(max_index, "None of the above")
