@@ -1,3 +1,8 @@
+"""
+calculators.py
+
+Sample grade calculation function file
+"""
 # This file is part of the schoolutils package.
 # Copyright (C) 2013 Richard Lawrence <richard.lawrence@berkeley.edu>
 #
@@ -15,17 +20,25 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 # 02110-1301, USA.
-from distutils.core import setup
 
-setup(name='schoolutils',
-      version='0.1.0',
-      description=('Utilities to track and manage student data, including '
-                   'a grade database, grade calculators, and more'),
-      url='',
-      author='Richard Lawrence',
-      author_email='richard.lawrence@berkeley.edu',
-      license='GPLv2+',
-      packages=['schoolutils',
-                'schoolutils.grading'],
-      #scripts=['bin/grade',],
-      )
+from schoolutils.grading import grader as g
+
+# Every grade calculation function consumes a dictionary containing
+# entered grades for one student and returns a dictionary containing
+# both the entered grades and the calculated grades.
+def calculate_grade_25A_fall2012(student_grades):
+    """Calculates the unweighted average of letter grades for Papers
+       1--3 and the exam grade.
+       Calculated grades are:
+         Grade average (4.0 scale)
+         Final grade (letter grade)
+    """
+    entered_grades = ["Paper 1", "Paper 2", "Paper 3", "Exam grade"]
+
+    avg = g.letter_grade_average(student_grades, entered_grades)
+    student_grades["Grade average"] = avg
+    student_grades["Final grade"] = g.points_to_letter(avg)
+
+    return student_grades
+
+
