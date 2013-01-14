@@ -18,18 +18,29 @@
 from distutils.core import setup
 
 setup(name='schoolutils',
-      version='0.1.0',
+      version='0.1.1',
       description=('Utilities to track and manage student data, including '
                    'a grade database, grade calculators, and more'),
       url='https://bitbucket.org/wyleyr/schoolutils',
       author='Richard Lawrence',
       author_email='richard.lawrence@berkeley.edu',
-      license='GPLv2+',
-      packages=['schoolutils',
-                'schoolutils.config',
-                'schoolutils.grading',
-                'schoolutils.institutions',
-                ],
-      data_files=[('examples', ['examples/*.py'])],
+      classifiers=[
+        'License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)',
+        'Programming Language :: Python',
+        'Topic :: Education',
+        'Intended Audience :: Education',
+        'Intended Audience :: End Users/Desktop',
+        'Intended Audience :: Developers',
+        'Environment :: Console',
+        'Development Status :: 2 - Pre-Alpha',
+        ],
+      packages=[
+        'schoolutils',
+        'schoolutils.config',
+        'schoolutils.grading',
+        'schoolutils.institutions',
+        ],
+      data_files=[('share/schoolutils/examples', ['examples/config.py',
+                                                  'examples/calculators.py'])],
       #scripts=['bin/grade',],
       )

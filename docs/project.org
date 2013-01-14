@@ -1,5 +1,5 @@
 * Tasks 
-** INPROGRESS [#A] Interfaces for calculating grades		  :grader:ui:
+** WAITING [#A] Interfaces for calculating grades		  :grader:ui:
    - this probably needs to be done in tandem with system configuration
    - need way to map current course to a grading function:
      + naming convention?  e.g. calculate_grades_25A_fall2012?
@@ -19,7 +19,7 @@
 ** DONE [#A] Interface to see/add/edit students in current course   :ui:edit:
 ** TODO [#A] Interface to see/edit grades in current assignment	    :ui:edit:
 ** TODO [#B] Interfaces to reporting functions		       :ui:reporting:
-** TODO [#C] More sophisticated UI? Curses-based?			 :ui:
+** TODO [#D] More sophisticated UI? Curses-based? 			 :ui:
 ** TODO [#C] Separation of 'view' and 'controller' UI code		 :ui:
 ** TODO [#B] Summary statistics					  :reporting:
  - for assignments
@@ -29,9 +29,11 @@
  - measure improvement
 ** TODO [#C] PGP encryption/decryption of database file		      :ui:db:
 ** TODO [#B] Export grades to gradebook format		   :bspace:ui:export:
-** TODO [#C] distribute on PyPI 				  :packaging:
+** INPROGRESS [#C] distribute on PyPI				  :packaging:
    - need to remove/abstract out Berkeley-specific code, like
      db.sid validator and bspace module
+   - better keywords/metadata
+   - docs
 ** TODO [#C] Interface for emailing grades, stats to students	  :ui:export:
 ** TODO [#C] Interface for creating mailing lists		  :ui:export:
 ** DONE [#A] System configuration			       :ui:packaging:
@@ -52,6 +54,22 @@
      that isn't too unwieldy?  so we could have get_student, get_course,
      get_assignment, ... which would all make for nicer interfaces
      for lookup-or-create type actions 
+** TODO [#A] Make sure examples/*.py get installed in a reasonable place :packaging:bug:
+** TODO [#A] Write docs for initial release!				:doc:
+** TODO [#D] Make compatible with Python 3			  :packaging:
+** TODO [#A] Figure out the best thing to do with user validators     :ui:db:
+** TODO [#B] Interfaces to edit existing assignments, courses	    :ui:edit:
+** TODO [#A] Make executable scripts with CLI options		     :ui:bin:
+   - bin/grade: start the grader
+     options:
+     + -a "Paper 1" : select assignment
+     + -c "course num" : select course
+     + -e : enter grades
+     + -g : calculate grades
+     + -i : import students
+     + -x : export grades
+** TODO [#B] Interface for exporting (sorted) lists of grades	  :ui:export:
+** TODO [#A] Test and fix nested KeyboardInterrupt loop breakout	 :ui:
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so
