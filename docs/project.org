@@ -1,5 +1,5 @@
 * Tasks 
-** TODO [#A] Interfaces for calculating grades			  :grader:ui:
+** INPROGRESS [#A] Interfaces for calculating grades		  :grader:ui:
    - this probably needs to be done in tandem with system configuration
    - need way to map current course to a grading function:
      + naming convention?  e.g. calculate_grades_25A_fall2012?
@@ -34,7 +34,7 @@
      db.sid validator and bspace module
 ** TODO [#C] Interface for emailing grades, stats to students	  :ui:export:
 ** TODO [#C] Interface for creating mailing lists		  :ui:export:
-** TODO [#A] System configuration			       :ui:packaging:
+** DONE [#A] System configuration			       :ui:packaging:
    Python module?  ConfigParser?
    - path to grader functions
    - path to db
