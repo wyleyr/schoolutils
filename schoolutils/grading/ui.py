@@ -226,6 +226,10 @@ class SimpleUI(BaseUI):
             # the search criteria at the time the user presses Ctrl-C
             if students:
                 student = students_menu(students)
+            elif not create:
+                # if no students have been found and creation is not an option,
+                # user wants to escape; so error should propagate 
+                raise KeyboardInterrupt
             
         if student:
             pass
