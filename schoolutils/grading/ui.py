@@ -4,9 +4,12 @@ ui.py
 User interfaces for grading utilities.
 """
 import os, sqlite3
-import db, bspace
 
 from schoolutils.config import user_config
+from schoolutils.grading import db
+
+# TODO: abstract from specific institution
+from schoolutils.institutions.ucberkeley import bspace
 
 def require(attribute, callback, message):
     """Require that an object has an attribute before executing a method.
