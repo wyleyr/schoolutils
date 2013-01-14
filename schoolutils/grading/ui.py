@@ -6,8 +6,7 @@ User interfaces for grading utilities.
 import os, sqlite3
 import db, bspace
 
-class BaseUI(object):
-    pass
+from schoolutils.config import user_config
 
 def require(attribute, callback, message):
     """Require that an object has an attribute before executing a method.
@@ -30,9 +29,60 @@ def require(attribute, callback, message):
         return method
     return method_factory
 
+class BaseUI(object):
+    def __init__(self):
+        self.db_file = file_path(user_config.gradedb_file)
+        if self.db_file and os.path.exists(self.db_file):
+            self.db_connection = sqlite3.connect(self.db_file)
+        else:
+            self.db_connection = None
+        
+        self.semester = user_config.current_semester 
+        self.year = user_config.current_year 
+        self.current_courses = user_config.current_courses
+
+        self.course_id = None
+        self.assignment_id = None
+        self.student_id = None
+
+        if user_config.default_course[0] and self.db_connection:
+            self.set_default_course()
+        if user_config.default_assignment and self.db_connection:
+            self.set_default_assignment()
+            
+    def set_default_course(self):
+        "Set course_id using user_config.default_course"
+        # TODO: course_id should also be settable via command line option 
+        sem, yr, num = user_config.default_course
+        try:
+            self.course_id = db.ensure_unique(db.select_courses(self.db_connection,
+                                                                semester=sem,
+                                                                year=yr,
+                                                                number=num))
+        except (AttributeError, db.NoRecordsFound, db.MultipleRecordsFound):
+            # AttributeError covers case where self.db_connection uninitialized
+            sys.stderr.write("Unable to locate a unique default course;"
+                             "ignoring.\n")
+            
+            
+    def set_default_assignment(self):
+        "Set assignment_id using user_config.default_assignment"
+        # TODO: assignment_id should also be settable via command-line option
+        try:
+            self.assignment_id = db.ensure_unique(
+                db.select_assignments(self.db_connection,
+                                      course_id=self.course_id,
+                                      name=user_config.default_assignment))
+        except (AttributeError, db.NoRecordsFound, db.MultipleRecordsFound):
+            # AttributeError covers case where self.db_connection uninitialized
+            sys.stderr.write("Unable to locate a unique default assignment;"
+                             "ignoring.\n")
+        
+
 class SimpleUI(BaseUI):
     """Manages a simple (command line) user interface.
     """
+    # Helpers for printing data to stdout
     STUDENT_FORMAT = '{last_name}, {first_name} (SID: {sid})'
     COURSE_FORMAT = '{number}: {name} ({semester} {year})'
     ASSIGNMENT_FORMAT = '{name} (due {due_date})'
@@ -56,16 +106,6 @@ class SimpleUI(BaseUI):
     def grade_formatter(self, grade_row):
         pass
    
-    def __init__(self):
-        self.db_file = None
-        self.db_connection = None
-        
-        self.semester = None
-        self.year = None
-        self.course_id = None
-        self.assignment_id = None
-        self.student_id = None
-
     # Actions which can be @require-d: 
     def close_database(self):
         """Close the current database connection."""
@@ -102,6 +142,7 @@ class SimpleUI(BaseUI):
             self.db_file = db_path
             self.db_connection = sqlite3.connect(db_path)
 
+            
     def get_student(self, create=False):
         """Lookup a student in the database, trying several methods.
            If create is True, allow (and offer) creating a new student using
