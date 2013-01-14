@@ -821,7 +821,7 @@ def date(s):
     y, m, d = s.strip().split('-')
     y = year(y)
     m = month(m)
-    d = day(m)
+    d = day(d)
     return datetime.date(y, m, d)
 
 def sid(s):
