@@ -1,0 +1,8 @@
+include README.txt
+include CHANGES.txt
+include LICENSE.txt
+include setup.py
+recursive-include schoolutils *.py 
+recursive-include examples *.py
+recursive-include docs *.txt *.org
+
