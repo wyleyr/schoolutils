@@ -5,7 +5,7 @@ User interfaces for grading utilities.
 """
 import os, sqlite3
 
-from schoolutils.config import user_config
+from schoolutils.config import user_config, user_calculators
 from schoolutils.grading import db
 
 # TODO: abstract from specific institution
@@ -55,7 +55,9 @@ class BaseUI(object):
             
     def set_default_course(self):
         "Set course_id using user_config.default_course"
-        # TODO: course_id should also be settable via command line option 
+        # TODO: course_id should also be settable via command line option
+        # TODO: fallback: if current_year and current_semester determine a unique
+        # course, use that
         sem, yr, num = user_config.default_course
         try:
             self.course_id = db.ensure_unique(db.select_courses(self.db_connection,
@@ -262,7 +264,7 @@ class SimpleUI(BaseUI):
                  self.import_students,
                  self.edit_student,
                  self.enter_grades,
-                 #self.calculate_grades,
+                 self.calculate_grades,
                  #self.import_grades,
                  #self.export_grades,
                  self.exit])
@@ -568,8 +570,44 @@ class SimpleUI(BaseUI):
     def export_grades(self):
         pass
 
+    @require('course_id', change_course,
+             "A selected course is required to calculate grades.")
     def calculate_grades(self):
-        pass
+        """Calculate grades.
+           Run the (user-defined) grade calculation function for students in the
+           current course.
+        """
+        _, name, num, yr, sem = db.select_courses(self.db_connection,
+                                                  course_id=self.course_id)[0]
+        safe_num = num.replace('-', '_').replace('.', '_')
+        calc_name = 'calculate_grade_' + safe_num + '_' + sem.lower() + str(yr)
+        calc_func = getattr(user_calculators, calc_name, None)
+
+        if not calc_func:
+            print ("Could not locate grade calculation function %s. "
+                   "Have you written it?" % calc_name)
+            print ""
+            return
+
+        students = db.select_students(self.db_connection,
+                                      course_id=self.course_id)
+        assignments = db.select_assignments(self.db_connection,
+                                            course_id=self.course_id)
+        
+        for s in students:
+            grades = db.select_grades(self.db_connection,
+                                      student_id=s[0],
+                                      course_id=self.course_id)
+
+            if len(grades) != len(assignments):
+                # TODO: something more sophisticated here
+                # skip? pass to grade function anyway? user-configurable behavior?
+                print ("Warning: %s does not have a grade for all assignments "
+                       "in this course." % self.student_formatter(s))
+                
+            grade_dict = calc_func(db.GradeDict(grades))
+            grade_dict.save(self.db_connection)
+            
 
     def exit(self):
         """Quit grader.
