@@ -825,15 +825,10 @@ def date(s):
     return datetime.date(y, m, d)
 
 def sid(s):
-    """Ensure s is a valid Berkeley SID"""
-    sid = s.strip()
-    if len(sid) != 8:
-        raise ValueError("SID must be 8 digits long")
-    for digit in sid:
-        if digit not in '0123456789':
-            raise ValueError("Non-numeric digit in SID: %s" % digit)
-    else:
-        return sid
+    """Ensure s is a valid SID.  This function is just an alias for
+       str(); provide your own in your validators.py
+    """
+    return str(s)
 
 def name(s):
     """Ensure s looks like a name"""
