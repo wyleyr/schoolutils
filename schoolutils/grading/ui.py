@@ -4,10 +4,12 @@ ui.py
 User interfaces for grading utilities.
 """
 import os, sqlite3
-import db, bspace
 
-class BaseUI(object):
-    pass
+from schoolutils.config import user_config, user_calculators
+from schoolutils.grading import db
+
+# TODO: abstract from specific institution
+from schoolutils.institutions.ucberkeley import bspace
 
 def require(attribute, callback, message):
     """Require that an object has an attribute before executing a method.
@@ -30,12 +32,65 @@ def require(attribute, callback, message):
         return method
     return method_factory
 
+class BaseUI(object):
+    def __init__(self):
+        self.db_file = file_path(user_config.gradedb_file)
+        if self.db_file and os.path.exists(self.db_file):
+            self.db_connection = sqlite3.connect(self.db_file)
+        else:
+            self.db_connection = None
+        
+        self.semester = user_config.current_semester 
+        self.year = user_config.current_year 
+        self.current_courses = user_config.current_courses
+
+        self.course_id = None
+        self.assignment_id = None
+        self.student_id = None
+
+        if user_config.default_course[0] and self.db_connection:
+            self.set_default_course()
+        if user_config.default_assignment and self.db_connection:
+            self.set_default_assignment()
+            
+    def set_default_course(self):
+        "Set course_id using user_config.default_course"
+        # TODO: course_id should also be settable via command line option
+        # TODO: fallback: if current_year and current_semester determine a unique
+        # course, use that
+        sem, yr, num = user_config.default_course
+        try:
+            self.course_id = db.ensure_unique(db.select_courses(self.db_connection,
+                                                                semester=sem,
+                                                                year=yr,
+                                                                number=num))
+        except (AttributeError, db.NoRecordsFound, db.MultipleRecordsFound):
+            # AttributeError covers case where self.db_connection uninitialized
+            sys.stderr.write("Unable to locate a unique default course;"
+                             "ignoring.\n")
+            
+            
+    def set_default_assignment(self):
+        "Set assignment_id using user_config.default_assignment"
+        # TODO: assignment_id should also be settable via command-line option
+        try:
+            self.assignment_id = db.ensure_unique(
+                db.select_assignments(self.db_connection,
+                                      course_id=self.course_id,
+                                      name=user_config.default_assignment))
+        except (AttributeError, db.NoRecordsFound, db.MultipleRecordsFound):
+            # AttributeError covers case where self.db_connection uninitialized
+            sys.stderr.write("Unable to locate a unique default assignment;"
+                             "ignoring.\n")
+        
+
 class SimpleUI(BaseUI):
     """Manages a simple (command line) user interface.
     """
+    # Helpers for printing data to stdout
     STUDENT_FORMAT = '{last_name}, {first_name} (SID: {sid})'
     COURSE_FORMAT = '{number}: {name} ({semester} {year})'
-    ASSIGNMENT_FORMAT = '' # TODO
+    ASSIGNMENT_FORMAT = '{name} (due {due_date})'
     GRADE_FORMAT = '' # TODO
 
     def course_formatter(self, course_row):
@@ -50,21 +105,12 @@ class SimpleUI(BaseUI):
                                           sid=student_row[3])
 
     def assignment_formatter(self, assignment_row):
-        pass
+        return self.ASSIGNMENT_FORMAT.format(name=assignment_row[2],
+                                             due_date=assignment_row[3])
 
     def grade_formatter(self, grade_row):
         pass
    
-    def __init__(self):
-        self.db_file = None
-        self.db_connection = None
-        
-        self.semester = None
-        self.year = None
-        self.course_id = None
-        self.assignment_id = None
-        self.student_id = None
-
     # Actions which can be @require-d: 
     def close_database(self):
         """Close the current database connection."""
@@ -101,6 +147,7 @@ class SimpleUI(BaseUI):
             self.db_file = db_path
             self.db_connection = sqlite3.connect(db_path)
 
+            
     def get_student(self, create=False):
         """Lookup a student in the database, trying several methods.
            If create is True, allow (and offer) creating a new student using
@@ -130,12 +177,12 @@ class SimpleUI(BaseUI):
             return self.options_menu(
                 "Select a student:",
                 students, 
-                lambda s: "{1}, {2} (SID: {3})".format(*s),
+                self.student_formatter,
                 allow_none=create)
                
         students = []
         try:
-            print ("Enter student data to lookup student. "
+            print ("Enter student data to lookup or create student. "
                    "Search uses fuzzy matching on name and email fields.\n"
                    "Use Ctrl-C to stop search and select from list.")
             sid = typed_input("Enter SID: ", db.sid, default='')
@@ -175,7 +222,14 @@ class SimpleUI(BaseUI):
                 student = students[0]
             
         except KeyboardInterrupt:
-            student = students_menu(students)
+            # don't bother with a selection menu if no students met all
+            # the search criteria at the time the user presses Ctrl-C
+            if students:
+                student = students_menu(students)
+            elif not create:
+                # if no students have been found and creation is not an option,
+                # user wants to escape; so error should propagate 
+                raise KeyboardInterrupt
             
         if student:
             pass
@@ -183,24 +237,18 @@ class SimpleUI(BaseUI):
             # give user a chance to update values they provided and provide values
             # they didn't enter
             vals = {'last_name': last_name, 'first_name': first_name,
-                    'SID': sid, 'email': email}
-            validators = {'last_name': db.name, 'first_name': db.name,
-                          'SID': db.sid, 'email': db.email}
+                    'sid': sid, 'email': email}
             print "Please provide data for the student to be created:"
-            vals = self.edit_dict(vals, validators=validators)
-            
-            student_id = db.create_student(self.db_connection,
-                                           first_name=vals['first_name'],
-                                           last_name=vals['last_name'],
-                                           sid=vals['SID'],
-                                           email=vals['email'])
+            vals = self.edit_student_dict(from_dict=vals)
+            vals.pop('student_id') # we're creating a new record
+            student_id = db.create_student(self.db_connection, **vals)
             student = db.select_students(self.db_connection,
                                          student_id=student_id)[0]
         else:
             print "Could not locate student with these criteria; please try again."
             return self.get_student(create=create)
 
-        print "Selected: {1}, {2} (SID: {3})".format(*student)
+        print "Selected: %s" % self.student_formatter(student)
         self.student_id = student[0]
         return student
 
@@ -220,7 +268,7 @@ class SimpleUI(BaseUI):
                  self.import_students,
                  self.edit_student,
                  self.enter_grades,
-                 #self.calculate_grades,
+                 self.calculate_grades,
                  #self.import_grades,
                  #self.export_grades,
                  self.exit])
@@ -232,6 +280,7 @@ class SimpleUI(BaseUI):
         """Change current course.
            Select an existing course from the database, or add a new one.
         """
+        # TODO: add support for selecting from user_config.current_courses
         self.print_course_info()
         self.actions_menu("What do you want to do?",
                         [self.select_course,
@@ -311,7 +360,6 @@ class SimpleUI(BaseUI):
         """
         assignments = db.select_assignments(self.db_connection,
                                             course_id=self.course_id)
-        assignment_to_str = lambda a: "{2} (due {3})".format(*a)
         if len(assignments) == 0:
             create = typed_input(
                 "No assignments found for the current course.  Create? (Y/N) ",
@@ -323,7 +371,7 @@ class SimpleUI(BaseUI):
         else:
             assignment = self.options_menu(
                 "Select an assignment for this course:",
-                assignments, assignment_to_str,
+                assignments, self.assignment_formatter,
                 escape=self.create_assignment, allow_none=True)
             if assignment:
                 self.assignment_id = assignment[0]
@@ -394,6 +442,8 @@ class SimpleUI(BaseUI):
             except KeyboardInterrupt:
                 print ""
                 break
+            # TODO: shortcut here for changing to another assignment?
+            # enter_grades_for_student method? (for a single student across all course assignments)
 
     @require('db_connection', change_database,
              "A database connection is required to import students.")
@@ -415,38 +465,26 @@ class SimpleUI(BaseUI):
         # assume, for now, that CSV files have been generated by bSpace:
         students = bspace.roster_csv_to_students(csv_path)
         formatter = lambda s: "{last_name: <15s} {first_name: <20s} {email: <30s} {sid: <8}".format(**s)
-        editor = lambda s: self.edit_dict(s, skip=['full_name'])
-        creator = lambda: self.edit_dict({'last_name':'',
-                                          'first_name':'',
-                                          'sid':'',
-                                          'email':''},
-                                         validators={
-                                          'last_name': db.name,
-                                          'first_name': db.name,
-                                          'sid': db.sid,
-                                          'email': db.email,
-                                         })
+        editor = lambda s: self.edit_student_dict(from_dict=s)
+        creator = self.edit_student_dict
         header = formatter({'last_name': "Last name", 'first_name': "First name",
                             'email': "Email", 'sid': "SID"})
         students = self.edit_table(students, header, formatter,
-                                   editor=editor, creator=creator)
+                                   editor=editor, creator=creator,
+                                   deleter=lambda s: None)
 
         for s in students:
+            s.pop('full_name') # name should now be properly split into last/first
             try:
-                student_id = db.get_student_id(self.db_connection,
-                                               sid=s['sid'],
-                                               first_name=s['first_name'],
-                                               last_name=s['last_name'])
+                s['student_id'] = db.get_student_id(self.db_connection,
+                                                    sid=s['sid'],
+                                                    first_name=s['first_name'],
+                                                    last_name=s['last_name'])
             except db.NoRecordsFound:
-                student_id = None
+                s['student_id'] = None
 
             student_id = db.create_or_update_student(
-                self.db_connection,
-                student_id=student_id,
-                last_name=s['last_name'],
-                first_name=s['first_name'],
-                sid=s['sid'],
-                email=s['email'])
+                self.db_connection, **s)
             course_member_id = db.create_course_member(
                 self.db_connection,
                 student_id=student_id,
@@ -461,6 +499,7 @@ class SimpleUI(BaseUI):
            Lookup students and modify their contact data and course memberships.
         """
         student = self.get_student(create=True)
+            
         self.actions_menu(
             "What do you want to do?",
             [self.edit_student_info, self.edit_student_courses])
@@ -474,17 +513,12 @@ class SimpleUI(BaseUI):
         """Edit student contact data.
            Change name, SID, email, etc. for current student.
         """
-        # TODO.  Need to figure out proper code sharing.
-        raise NotImplementedError
         student = db.select_students(self.db_connection,
                                      student_id=self.student_id)[0]
-        d = self.student_row_to_dict(student)
-        d = self.edit_dict(d, validators={'last_name': db.name,
-                                          'first_name': db.name,
-                                          'sid': db.sid,
-                                          'email': db.email})
+        d = self.edit_student_dict(from_row=student)
         
-        
+        self.student_id = db.create_or_update_student(self.db_connection, **d)
+        print "Student information updated."
 
     @require('db_connection', change_database,
              "A database connection is required to edit course memberships.")
@@ -543,8 +577,44 @@ class SimpleUI(BaseUI):
     def export_grades(self):
         pass
 
+    @require('course_id', change_course,
+             "A selected course is required to calculate grades.")
     def calculate_grades(self):
-        pass
+        """Calculate grades.
+           Run the (user-defined) grade calculation function for students in the
+           current course.
+        """
+        _, name, num, yr, sem = db.select_courses(self.db_connection,
+                                                  course_id=self.course_id)[0]
+        safe_num = num.replace('-', '_').replace('.', '_')
+        calc_name = 'calculate_grade_' + safe_num + '_' + sem.lower() + str(yr)
+        calc_func = getattr(user_calculators, calc_name, None)
+
+        if not calc_func:
+            print ("Could not locate grade calculation function %s. "
+                   "Have you written it?" % calc_name)
+            print ""
+            return
+
+        students = db.select_students(self.db_connection,
+                                      course_id=self.course_id)
+        assignments = db.select_assignments(self.db_connection,
+                                            course_id=self.course_id)
+        
+        for s in students:
+            grades = db.select_grades(self.db_connection,
+                                      student_id=s[0],
+                                      course_id=self.course_id)
+
+            if len(grades) != len(assignments):
+                # TODO: something more sophisticated here
+                # skip? pass to grade function anyway? user-configurable behavior?
+                print ("Warning: %s does not have a grade for all assignments "
+                       "in this course." % self.student_formatter(s))
+                
+            grade_dict = calc_func(db.GradeDict(grades))
+            grade_dict.save(self.db_connection)
+            
 
     def exit(self):
         """Quit grader.
@@ -620,6 +690,7 @@ class SimpleUI(BaseUI):
             max_index += 1
             print menu_format.format(max_index, escape.__doc__.splitlines()[0])
         if allow_none:
+            # TODO: something wrong with logic here; escape doesn't work
             none_option = max_index
             max_index += 1
             print menu_format.format(max_index, "None of the above")
@@ -732,32 +803,67 @@ class SimpleUI(BaseUI):
                                      for word in k.split('_')])
             pretty_current = (" (default: %s): " % v) if v else ": "
             new_v = typed_input("Enter %s%s" % (pretty_field, pretty_current),
-                                validator)
+                                validator, default=v)
             if new_v:
                 d[k] = new_v
 
         return d
+
+    def edit_student_dict(self, from_dict=None, from_row=None):
+        """Convenience wrapper for edit_dict for student data.
+           from_row, if provided, should be a row from the students table,
+             formatted like:
+             (student_id, last_name, first_name, sid, email)
+           from_dict, if provided, should have keys:
+             last_name, first_name, sid, email
+           You may not pass both from_row and from_dict; but you may pass
+             neither.  In that case, the user will have to enter all fields.
+           Returns a dictionary suitable to pass to *_student database
+             functions as kwargs, with keys:
+             student_id, last_name, first_name, sid, email
+        """
+        if from_dict and from_row:
+            raise ValueError("You may not pass both from_dict and from_row")
+
+        db_fields = ['student_id', 'last_name', 'first_name', 'sid', 'email']
+        validators = {'last_name': db.name, 'first_name': db.name,
+                      'sid': db.sid, 'email': db.email}
+        d = {}
+        for i, f in enumerate(db_fields):
+            if from_row:
+                d[f] = from_row[i]
+            elif from_dict:
+                d[f] = from_dict.get(f, None)
+            else:
+                d[f] = None
+                
+        return self.edit_dict(d, validators=validators, skip=['student_id'])
         
     def print_course_info(self):
         "Prints information about the currently selected course"
         if self.course_id:
             course = db.select_courses(self.db_connection, course_id=self.course_id)[0]
-            print "Current course is %(num)s: %(name)s (%(sem)s %(year)s)" % {
-                'num': course[2],
-                'name': course[1],
-                'sem': course[4],
-                'year': course[3]}
+            print "Current course is: %s" % self.course_formatter(course) 
         else:
-            print "No current course"
+            print "No course selected"
            
     def print_assignment_info(self):
         "Prints information about the currently selected assignment"
         if self.assignment_id:
             assignment = db.select_assignments(self.db_connection,
                                                assignment_id=self.assignment_id)[0]
-            print "Current assignment is: %s" % assignment[2]
+            print "Current assignment is: %s" % self.assignment_formatter(assignment)
         else:
-            print "No current assignment"
+            print "No assignment selected"
+
+    def print_student_info(self):
+        "Prints information about the currently select student"
+        if self.student_id:
+            student = db.select_students(self.db_connection,
+                                         student_id=self.student_id)[0]
+            print "Current student is: %s" % self.student_formatter(student)
+        else:
+            print "No student selected"
 
     def print_db_info(self):
          "Prints information about the database connection"

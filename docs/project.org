@@ -1,0 +1,64 @@
+* Tasks 
+** INPROGRESS [#A] Interfaces for calculating grades		  :grader:ui:
+   - this probably needs to be done in tandem with system configuration
+   - need way to map current course to a grading function:
+     + naming convention?  e.g. calculate_grades_25A_fall2012?
+       this is nice and simple but maybe not general enough...
+       would get complicated when course numbers include characters that
+       can't be in Python identifiers ('-', '.')
+     + configuration must include a function that maps course rows to
+       grading functions?
+** DONE [#A] Support for email in students table		      :db:ui:
+** CANCELED [#B] Support for middle name in students table		 :db:
+   I've decided the right thing to do here is to leave middle names
+   in the first_name column, but implement proper fuzzy searching of
+   the students table
+** DONE [#B] More sophisticated searching			      :db:ui:
+   currently all lookups are just exact matches, but this is going to
+   become cumbersome for text fields (esp. names)
+** DONE [#A] Interface to see/add/edit students in current course   :ui:edit:
+** TODO [#A] Interface to see/edit grades in current assignment	    :ui:edit:
+** TODO [#B] Interfaces to reporting functions		       :ui:reporting:
+** TODO [#C] More sophisticated UI? Curses-based?			 :ui:
+** TODO [#C] Separation of 'view' and 'controller' UI code		 :ui:
+** TODO [#B] Summary statistics					  :reporting:
+ - for assignments
+ - for a course overall
+ - for a course in comparison to others
+ - for individual students
+ - measure improvement
+** TODO [#C] PGP encryption/decryption of database file		      :ui:db:
+** TODO [#B] Export grades to gradebook format		   :bspace:ui:export:
+** TODO [#C] distribute on PyPI 				  :packaging:
+   - need to remove/abstract out Berkeley-specific code, like
+     db.sid validator and bspace module
+** TODO [#C] Interface for emailing grades, stats to students	  :ui:export:
+** TODO [#C] Interface for creating mailing lists		  :ui:export:
+** DONE [#A] System configuration			       :ui:packaging:
+   Python module?  ConfigParser?
+   - path to grader functions
+   - path to db
+   - current course(s) / semester, year
+   - email setup
+
+** TODO [#B] Support for readline					 :ui:
+   - in db lookups 
+   - in path 
+** TODO [#B] DB-level sorting						 :db:
+   - just have default ORDER BY clauses?
+   - order_by interface in API?
+** TODO [#B] Abstract get_student logic into incremental_search?	 :ui:
+   - is it possible to have a generic interface for incremental seach
+     that isn't too unwieldy?  so we could have get_student, get_course,
+     get_assignment, ... which would all make for nicer interfaces
+     for lookup-or-create type actions 
+* Bug notes
+** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
+   - problem was join: a student can appear in multiple courses, so
+     if no course constraints are present, multiple student records can
+     be returned
+   - actually, there's still a problem in the case where course_name is
+     given but the student is enrolled in multiple courses with the
+     same name (or similar names with the _like version); but this edge
+     case is rare enough that it probably won't happen for other
+     reasons, so I won't fix it for now
