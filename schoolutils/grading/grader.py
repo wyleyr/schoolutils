@@ -3,7 +3,27 @@ grader.py
 
 Utilities for calculating and reporting grades
 """
+# This file is part of the schoolutils package.
+# Copyright (C) 2013 Richard Lawrence <richard.lawrence@berkeley.edu>
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+# 02110-1301, USA.
+
 import csv, os, sys, math, optparse
+
+from schoolutils.config import user_calculators
 
 #
 # Top-level interfaces
@@ -14,7 +34,9 @@ def csv_to_csv(in_file, out_file, options):
     "Interface for reading and writing CSV files"        
     fieldnames, rows = read_csv(in_file)
 
-    calculated_rows = [calculate_grade(row) for row in rows]
+    # TODO: user_calculators need not provide a single
+    # calculate_grade...
+    calculated_rows = [user_calculators.calculate_grade(row) for row in rows]
     
     if options.sort_field:
         calculated_rows = sort_grade_list(calculated_rows, options.sort_field)
@@ -36,30 +58,6 @@ def sort_grade_list(rows, sort_field):
         
     rows.sort(cmp=cmp_overall)
     return rows
-
-#
-# Grade calculation functions for specific courses
-#
-# Every grade calculation function consumes a dictionary containing
-# entered grades for one student and returns a dictionary containing
-# both the entered grades and the calculated grades.
-def calculate_grade_spring2012(sgs):
-    raise NotImplementedError("Implementation of calculate_grade_spring2012 is gone")
-
-def calculate_grade_summer2012(sgs):
-    raise NotImplementedError("Implementation of calculate_grade_summer2012 is gone")
-
-def calculate_grade_fall2012(sgs):
-    entered_grades = ["Paper 1", "Paper 2", "Paper 3", "Exam grade"]
-
-    gavg = letter_grade_average(sgs, entered_grades)
-    sgs["Grade average"] = gavg
-    sgs["Final grade"] = points_to_letter(gavg)
-
-    return sgs
-
-# update this every semester
-calculate_grade = calculate_grade_fall2012
 
 #
 # Utility functions for grade calculations
@@ -130,7 +128,7 @@ def letter_to_number(letter_grade, scale):
 
 def number_to_letter(n, scale):
     """Convert a number grade n to a letter using a given scale.
-       Returns 'I' for float('Nan') grades"""
+       Returns 'I' for float('Nan') grades."""
     # any missing grades should default to Incomplete:
     if math.isnan(n):
         return 'I'
@@ -161,8 +159,7 @@ def extract_and_zero_grades(fields, d):
 def letter_grade_average(sgs, fieldnames, weights=None):
     """4.0-scale average of the letter grades found in sgs.
        If given, weights[i] should be a weight for the letter grade in
-       sgs[fieldnames[i]].
-    """
+       sgs[fieldnames[i]]."""
     lgrades = [sgs[field] for field in fieldnames]
     pgrades = map(letter_to_points, lgrades)
 
@@ -177,11 +174,17 @@ def unweighted_average(grades):
 
 def weighted_average(grades, weights):
     """Calculate a weighted average.
-    weights[i] should be the weight given to the grade in grades[i].
-    This function does not check that weights sum to 1 or normalize
-    the resulting grades.
-    """
+       weights[i] should be the weight given to the grade in grades[i].
+       This function does not check that weights sum to 1 or normalize
+       the resulting grades."""
     return sum([n[0] * n[1] for n in zip(grades, weights)])
+
+def points_to_weights(point_values):
+    """Convert a list of point values to a list of fractional weights.
+       The return value at index i is the fraction that point_values[i]
+       represents of the sum of point_values."""
+    s = sum(point_values)
+    return [float(p)/s for p in point_values]
 
 #
 # I/O
