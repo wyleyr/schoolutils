@@ -5,6 +5,8 @@ Utilities for calculating and reporting grades
 """
 import csv, os, sys, math, optparse
 
+from schoolutils.config import user_calculators
+
 #
 # Top-level interfaces
 #
@@ -14,7 +16,9 @@ def csv_to_csv(in_file, out_file, options):
     "Interface for reading and writing CSV files"        
     fieldnames, rows = read_csv(in_file)
 
-    calculated_rows = [calculate_grade(row) for row in rows]
+    # TODO: user_calculators need not provide a single
+    # calculate_grade...
+    calculated_rows = [user_calculators.calculate_grade(row) for row in rows]
     
     if options.sort_field:
         calculated_rows = sort_grade_list(calculated_rows, options.sort_field)
@@ -36,30 +40,6 @@ def sort_grade_list(rows, sort_field):
         
     rows.sort(cmp=cmp_overall)
     return rows
-
-#
-# Grade calculation functions for specific courses
-#
-# Every grade calculation function consumes a dictionary containing
-# entered grades for one student and returns a dictionary containing
-# both the entered grades and the calculated grades.
-def calculate_grade_spring2012(sgs):
-    raise NotImplementedError("Implementation of calculate_grade_spring2012 is gone")
-
-def calculate_grade_summer2012(sgs):
-    raise NotImplementedError("Implementation of calculate_grade_summer2012 is gone")
-
-def calculate_grade_fall2012(sgs):
-    entered_grades = ["Paper 1", "Paper 2", "Paper 3", "Exam grade"]
-
-    gavg = letter_grade_average(sgs, entered_grades)
-    sgs["Grade average"] = gavg
-    sgs["Final grade"] = points_to_letter(gavg)
-
-    return sgs
-
-# update this every semester
-calculate_grade = calculate_grade_fall2012
 
 #
 # Utility functions for grade calculations
