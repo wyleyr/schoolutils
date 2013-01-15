@@ -62,6 +62,19 @@
 ** TODO [#A] Write docs for initial release!				:doc:
 ** TODO [#D] Make compatible with Python 3			  :packaging:
 ** TODO [#A] Figure out the best thing to do with user validators     :ui:db:
+   useful validators include:
+   - sid
+   - course_num
+   - assignment_name
+   what's the proper behavior here?  should db module import user_validators,
+   and wrap the appropriate validator in its own version?
+   e.g.
+   from schoolutils.config import user_validators
+   def sid(s):
+       if user_validators.sid:
+          return user_validators.sid(s)
+       else:
+          # ...
 ** TODO [#B] Interfaces to edit existing assignments, courses	    :ui:edit:
 ** TODO [#A] Make executable scripts with CLI options		     :ui:bin:
    - bin/grade: start the grader
@@ -74,6 +87,12 @@
      + -x : export grades
 ** TODO [#B] Interface for exporting (sorted) lists of grades	  :ui:export:
 ** TODO [#A] Test and fix nested KeyboardInterrupt loop breakout	 :ui:
+** TODO [#B] Figure out institution setup				 :ui:
+   - need an API definition for institution modules
+     + validators?
+     + csv formats?
+   - institution var in user_config
+   - import user_institution module in config? 
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so
