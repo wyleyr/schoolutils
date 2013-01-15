@@ -54,7 +54,11 @@
      that isn't too unwieldy?  so we could have get_student, get_course,
      get_assignment, ... which would all make for nicer interfaces
      for lookup-or-create type actions 
-** TODO [#A] Make sure examples/*.py get installed in a reasonable place :packaging:bug:
+** DONE [#A] Make sure examples/*.py get installed in a reasonable place :packaging:bug:
+   This is fixed reasonably well, for Debian-style systems at least;
+   pip installs examples to /usr/local/share/schoolutils/examples.
+   No idea if it works, or how, on Windows or other Unixes.  May need
+   to revisit in the future.
 ** TODO [#A] Write docs for initial release!				:doc:
 ** TODO [#D] Make compatible with Python 3			  :packaging:
 ** TODO [#A] Figure out the best thing to do with user validators     :ui:db:

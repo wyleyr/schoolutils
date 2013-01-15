@@ -18,7 +18,7 @@
 from distutils.core import setup
 
 setup(name='schoolutils',
-      version='0.1.1',
+      version='0.1.2',
       description=('Utilities to track and manage student data, including '
                    'a grade database, grade calculators, and more'),
       url='https://bitbucket.org/wyleyr/schoolutils',
@@ -39,8 +39,9 @@ setup(name='schoolutils',
         'schoolutils.config',
         'schoolutils.grading',
         'schoolutils.institutions',
+        'schoolutils.institutions.ucberkeley',
         ],
+      scripts=['bin/grade',],
       data_files=[('share/schoolutils/examples', ['examples/config.py',
                                                   'examples/calculators.py'])],
-      #scripts=['bin/grade',],
       )

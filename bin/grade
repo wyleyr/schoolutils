@@ -1,0 +1,8 @@
+#!/usr/bin/env python
+
+from schoolutils.grading import ui
+
+if __name__ == '__main__':
+  u = ui.SimpleUI()
+  u.main_loop()
+  exit(0)
