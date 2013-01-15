@@ -41,7 +41,7 @@ setup(name='schoolutils',
         'schoolutils.institutions',
         'schoolutils.institutions.ucberkeley',
         ],
+      scripts=['bin/grade',],
       data_files=[('share/schoolutils/examples', ['examples/config.py',
                                                   'examples/calculators.py'])],
-      #scripts=['bin/grade',],
       )
