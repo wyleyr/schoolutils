@@ -1,8 +1,72 @@
 #!/usr/bin/env python
 
-from schoolutils.grading import ui
+# This file is part of the schoolutils package.
+# Copyright (C) 2013 Richard Lawrence <richard.lawrence@berkeley.edu>
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+# 02110-1301, USA.
 
+# TODO: use argparse if available (2.7+) since optparse is deprecated
+from optparse import OptionValueError, OptionParser as Parser
+
+from schoolutils.grading import ui, db
+
+def make_callback(validator):
+    def callback(option, opt_str, value, parser):
+        try:
+            v = validator(value)
+            setattr(parser.values, option.dest, v)
+        except ValueError as e:
+            raise OptionValueError(
+              "Bad value for %(option)s: %(err)s" %
+              {'option': opt_str, 'err': str(e)})
+    return callback
+      
+def main():
+    desc = ("Run the schoolutils grading program.\n"
+            "Command line options override the values in your config.py module.")
+    parser = Parser(description=desc)
+    parser.add_option("-d", "--db-file",
+                      dest="gradedb_file",
+                      type="string",
+                      metavar="PATH",
+                      help="Open grade database at PATH")
+    parser.add_option("-y", "--year",
+                      dest="current_year",
+                      type="string",
+                      metavar="YEAR",
+                      help="Select YEAR as current year")
+    parser.add_option("-s", "--semester",
+                      dest="current_semester",
+                      type="string",
+                      metavar="SEMESTER",
+                      help="Select SEMESTER as current semester")
+    parser.add_option("-c", "--course",
+                      dest="default_course",
+                      type="string",
+                      metavar="NUMBER",
+                      help="Select course NUMBER as current course")
+    parser.add_option("-a", "--assignment",
+                      dest="default_assignment",
+                      metavar="NAME",
+                      help="Select assignment NAME as current assignment")
+    options, args = parser.parse_args()
+
+    u = ui.SimpleUI(options=options)
+    u.main_loop()
+ 
+    
 if __name__ == '__main__':
-  u = ui.SimpleUI()
-  u.main_loop()
-  exit(0)
+    main()
