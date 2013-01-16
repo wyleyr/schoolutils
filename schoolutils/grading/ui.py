@@ -24,7 +24,7 @@ User interfaces for grading utilities.
 import os, sys, sqlite3
 
 from schoolutils.config import user_config, user_calculators
-from schoolutils.grading import db
+from schoolutils.grading import db, validators
 
 # TODO: abstract from specific institution
 from schoolutils.institutions.ucberkeley import bspace
@@ -105,10 +105,12 @@ class BaseUI(object):
         """Set semester, year, current_courses, and course_id from user config
            and CLI options"""
         
-        self.semester = self.get_config_option('current_semester', db.semester)
-        self.year = self.get_config_option('current_year', db.year)
+        self.semester = self.get_config_option('current_semester',
+                                               validators.semester)
+        self.year = self.get_config_option('current_year', validators.year)
         self.current_courses = user_config.current_courses
-        course_num = self.get_config_option('default_course', db.course_number)
+        course_num = self.get_config_option('default_course',
+                                            validators.course_number)
         
         if not (self.db_connection and self.semester and self.year):
             # don't bother looking for a course without a semester and year
@@ -129,7 +131,7 @@ class BaseUI(object):
     def initial_assignment_setup(self):
         "Set assignment_id using user config and CLI options"
         assignment_name = self.get_config_option('default_assignment',
-                                                 db.assignment_name)
+                                                 validators.assignment_name)
         if not (self.db_connection and self.course_id and assignment_name):
             return
         
@@ -244,18 +246,20 @@ class SimpleUI(BaseUI):
             print ("Enter student data to lookup or create student. "
                    "Search uses fuzzy matching on name and email fields.\n"
                    "Use Ctrl-C to stop search and select from list.")
-            sid = typed_input("Enter SID: ", db.sid, default='')
+            sid = typed_input("Enter SID: ", validators.sid, default='')
             students = db.select_students(self.db_connection, sid=sid)
             quit_if_unique(students)
 
-            last_name = typed_input("Enter last name: ", db.name, default='')
+            last_name = typed_input("Enter last name: ", validators.name,
+                                    default='')
             students = db.select_students(self.db_connection,
                                           sid=sid,
                                           last_name=last_name,
                                           fuzzy=True)
             quit_if_unique(students)
             
-            first_name = typed_input("Enter first name: ", db.name, default='')
+            first_name = typed_input("Enter first name: ", validators.name,
+                                     default='')
             students = db.select_students(self.db_connection,
                                           sid=sid,
                                           last_name=last_name,
@@ -263,7 +267,7 @@ class SimpleUI(BaseUI):
                                           fuzzy=True)
             quit_if_unique(students)
 
-            email = typed_input("Enter email: ", db.email, default='')
+            email = typed_input("Enter email: ", validators.email, default='')
             students = db.select_students(self.db_connection,
                                           sid=sid,
                                           last_name=last_name,
@@ -353,10 +357,12 @@ class SimpleUI(BaseUI):
            Lookup an existing course in the database by semester, name, or number.
         """
         print "(Press Enter to skip a given search criterion)"
-        year = typed_input("Enter year: ", db.year, default='') or None
-        semester = typed_input("Enter semester: ", db.semester, default='') or None
-        course_num = typed_input("Enter course number: ", str) or None
-        course_name = typed_input("Enter course name: ", str) or None
+        year = typed_input("Enter year: ", validators.year, default='') 
+        semester = typed_input("Enter semester: ", validators.semester,
+                               default='') 
+        course_num = typed_input("Enter course number: ",
+                                 validators.course_number) 
+        course_name = typed_input("Enter course name: ", validators.course_name)
 
         courses = db.select_courses(self.db_connection,
                                     year=year, semester=semester,
@@ -385,10 +391,12 @@ class SimpleUI(BaseUI):
            Add a new course to the database and select it as the current
            course.
         """
-        year = typed_input("Enter year: ", db.year)
-        semester = typed_input("Enter semester: ", db.semester)
-        course_num = typed_input("Enter course number: ", str)
-        course_name = typed_input("Enter course name: ", str)
+        year = typed_input("Enter year: ", validators.year)
+        semester = typed_input("Enter semester: ", validators.semester)
+        course_num = typed_input("Enter course number: ",
+                                 validators.course_number)
+        course_name = typed_input("Enter course name: ",
+                                  validators.course_name)
 
         course_id = db.create_course(
             self.db_connection,
@@ -444,11 +452,12 @@ class SimpleUI(BaseUI):
         """Create a new assignment.
            Add a new assignment to the database and select it as the current assignment.
         """
-        name = typed_input("Enter assignment name: ", str)
+        name = typed_input("Enter assignment name: ", validators.assignment_name)
         description = typed_input("Enter description: ", str, default='')
-        due_date = typed_input("Enter due date (YYYY-MM-DD): ", db.date)
-        grade_type = typed_input("Enter grade type: ", str)
-        weight = typed_input("Enter weight (as decimal): ", float)
+        due_date = typed_input("Enter due date (YYYY-MM-DD): ", validators.date)
+        grade_type = typed_input("Enter grade type: ", validators.grade_type)
+        weight = typed_input("Enter weight (as decimal): ",
+                             validators.grade_weight)
 
         self.assignment_id = db.create_assignment(
             self.db_connection,
@@ -467,6 +476,8 @@ class SimpleUI(BaseUI):
         """Enter grades.
            Enter grades for the current assignment for individual students.
         """
+        # TODO: select grade validator based on assignment type
+        # _, __, = select_assignments(self.db_connection, assignment_id=self.assignment_id)
         print ""
         print "Use Control-C to finish entering grades."
         while True:
@@ -717,7 +728,7 @@ class SimpleUI(BaseUI):
         else:
             prompt = "Which action? (enter a number): "
 
-        validator = lambda s: db.int_in_range(s, 0, len(actions))
+        validator = lambda s: validators.int_in_range(s, 0, len(actions))
         i = typed_input(prompt, validator,
                         default=actions.index(default) if default in actions else None)
         print "" # visually separate menu and selection 
@@ -754,7 +765,7 @@ class SimpleUI(BaseUI):
             max_index += 1
             print menu_format.format(max_index, "None of the above")
 
-        validator = lambda s: db.int_in_range(s, 0, max_index+1)
+        validator = lambda s: validators.int_in_range(s, 0, max_index+1)
             
         idx = typed_input("Which option? (enter a number): ", validator)
         print "" # visually separate menu and selection input 
@@ -788,13 +799,13 @@ class SimpleUI(BaseUI):
             s = s.strip().lower()
             if s.startswith('d'):
                 action = 'd'
-                idx = db.int_in_range(s[1:], 0, len(editable_rows)+1)
+                idx = validators.int_in_range(s[1:], 0, len(editable_rows)+1)
             elif s.startswith('i'):
                 action = 'i'
                 idx = None
             else:
                 action = 'e'
-                idx = db.int_in_range(s, 0, len(editable_rows)+1)
+                idx = validators.int_in_range(s, 0, len(editable_rows)+1)
             return action, idx
                 
         while True:
@@ -885,8 +896,8 @@ class SimpleUI(BaseUI):
             raise ValueError("You may not pass both from_dict and from_row")
 
         db_fields = ['student_id', 'last_name', 'first_name', 'sid', 'email']
-        validators = {'last_name': db.name, 'first_name': db.name,
-                      'sid': db.sid, 'email': db.email}
+        vlds = {'last_name': validators.name, 'first_name': validators.name,
+                'sid': validators.sid, 'email': validators.email}
         d = {}
         for i, f in enumerate(db_fields):
             if from_row:
@@ -896,7 +907,7 @@ class SimpleUI(BaseUI):
             else:
                 d[f] = None
                 
-        return self.edit_dict(d, validators=validators, skip=['student_id'])
+        return self.edit_dict(d, validators=vlds, skip=['student_id'])
         
     def print_course_info(self):
         "Prints information about the currently selected course"

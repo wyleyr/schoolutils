@@ -66,7 +66,6 @@ def user_modules():
     try:
         user_validators = imp.load_source('user_validators',
                                           USER_VALIDATORS_FILE) 
-        # TODO: add defaults?
     except (IOError, ImportError):
         user_validators = validators
         
