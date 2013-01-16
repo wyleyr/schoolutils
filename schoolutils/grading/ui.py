@@ -548,7 +548,8 @@ class SimpleUI(BaseUI):
                                    deleter=lambda s: None)
 
         for s in students:
-            s.pop('full_name') # name should now be properly split into last/first
+            if 'full_name' in s:
+                s.pop('full_name') # name should now be properly split 
             try:
                 s['student_id'] = db.get_student_id(self.db_connection,
                                                     sid=s['sid'],
