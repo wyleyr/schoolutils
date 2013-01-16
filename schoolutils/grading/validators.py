@@ -21,6 +21,8 @@ Validator functions for grading utilities
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 # 02110-1301, USA.
 
+import datetime
+
 from schoolutils.config import user_validators
 
 def user_override(f):
