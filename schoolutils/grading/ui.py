@@ -336,6 +336,10 @@ class SimpleUI(BaseUI):
                  #self.export_grades,
                  self.exit])
 
+            # commit after successful completion of any top-level action
+            # to avoid data-loss
+            self.db_connection.commit()
+
            
     @require('db_connection', change_database,
              "A database connection is required to change the current course.")
