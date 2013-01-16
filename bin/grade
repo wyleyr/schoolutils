@@ -21,7 +21,7 @@
 # TODO: use argparse if available (2.7+) since optparse is deprecated
 from optparse import OptionValueError, OptionParser as Parser
 
-from schoolutils.grading import ui, db
+from schoolutils.grading import ui
 
 def make_callback(validator):
     def callback(option, opt_str, value, parser):
