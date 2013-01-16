@@ -67,7 +67,7 @@ def user_modules():
         user_validators = imp.load_source('user_validators',
                                           USER_VALIDATORS_FILE) 
     except (IOError, ImportError):
-        user_validators = validators
+        user_validators = imp.new_module('user_validators')
         
     return user_config, user_calculators, user_validators
 
