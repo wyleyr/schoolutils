@@ -36,8 +36,8 @@ CONFIG_DEFAULTS = {
     'current_semester': None,
     'current_year': datetime.date.today().year,
     'current_courses': [],
-    'default_course': (None, None, None), # semester, year, course_num
-    'default_assignment': None,
+    'default_course': '', 
+    'default_assignment': '',
 }
 
 def add_defaults(m, defaults):
@@ -66,9 +66,8 @@ def user_modules():
     try:
         user_validators = imp.load_source('user_validators',
                                           USER_VALIDATORS_FILE) 
-        # TODO: add defaults?
     except (IOError, ImportError):
-        user_validators = validators
+        user_validators = imp.new_module('user_validators')
         
     return user_config, user_calculators, user_validators
 

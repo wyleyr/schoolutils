@@ -17,10 +17,19 @@
 # 02110-1301, USA.
 from distutils.core import setup
 
+try:
+    readme = open('README.rst', 'r')
+    long_desc = readme.read()
+except:
+    long_desc = ''
+finally:
+    readme.close()
+    
 setup(name='schoolutils',
-      version='0.1.2',
+      version='0.1.3',
       description=('Utilities to track and manage student data, including '
                    'a grade database, grade calculators, and more'),
+      long_description=long_desc,
       url='https://bitbucket.org/wyleyr/schoolutils',
       author='Richard Lawrence',
       author_email='richard.lawrence@berkeley.edu',

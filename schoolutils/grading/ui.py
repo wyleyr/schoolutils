@@ -21,10 +21,10 @@ User interfaces for grading utilities.
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 # 02110-1301, USA.
 
-import os, sqlite3
+import os, sys, sqlite3
 
 from schoolutils.config import user_config, user_calculators
-from schoolutils.grading import db
+from schoolutils.grading import db, validators
 
 # TODO: abstract from specific institution
 from schoolutils.institutions.ucberkeley import bspace
@@ -51,54 +51,97 @@ def require(attribute, callback, message):
     return method_factory
 
 class BaseUI(object):
-    def __init__(self):
-        self.db_file = file_path(user_config.gradedb_file)
-        if self.db_file and os.path.exists(self.db_file):
-            self.db_connection = sqlite3.connect(self.db_file)
+    def __init__(self, options=None):
+        """Initialize grading program UI.
+           options, if provided, should be an options structure produced by
+             optparse
+        """
+        if options:
+            self.cli_options = options
         else:
-            self.db_connection = None
+            self.cli_options = None
+            
         
-        self.semester = user_config.current_semester 
-        self.year = user_config.current_year 
-        self.current_courses = user_config.current_courses
-
+        self.semester = None
+        self.year = None
+        self.current_courses = []
         self.course_id = None
         self.assignment_id = None
         self.student_id = None
 
-        if user_config.default_course[0] and self.db_connection:
-            self.set_default_course()
-        if user_config.default_assignment and self.db_connection:
-            self.set_default_assignment()
-            
-    def set_default_course(self):
-        "Set course_id using user_config.default_course"
-        # TODO: course_id should also be settable via command line option
-        # TODO: fallback: if current_year and current_semester determine a unique
-        # course, use that
-        sem, yr, num = user_config.default_course
+        self.initial_database_setup()
+        self.initial_course_setup()
+        self.initial_assignment_setup()
+
+        
+    def get_config_option(self, option_name, validator, default=None):
+        """Return the appropriate config value from CLI options or user config.
+           option_name should be an attribute to look for on both the options
+             object and the user_config module.  CLI options override user_config
+             values.
+           validator will be applied to the value.
+           Returns the validated value, or default if option is not
+           supplied by the user or the user-supplied value does not
+           pass validation.
+        """
+        val = (getattr(self.cli_options, option_name, None) or
+               getattr(user_config, option_name, default))
         try:
-            self.course_id = db.ensure_unique(db.select_courses(self.db_connection,
-                                                                semester=sem,
-                                                                year=yr,
-                                                                number=num))
-        except (AttributeError, db.NoRecordsFound, db.MultipleRecordsFound):
-            # AttributeError covers case where self.db_connection uninitialized
-            sys.stderr.write("Unable to locate a unique default course;"
+            return validator(val)
+        except ValueError:
+            return default
+
+    def initial_database_setup(self):
+        "Set db_file and db_connection from user config and CLI options"
+        self.db_file = self.get_config_option('gradedb_file', file_path)
+        
+        if self.db_file and os.path.exists(self.db_file):
+            self.db_connection = sqlite3.connect(self.db_file)
+        else:
+            self.db_connection = None
+
+            
+    def initial_course_setup(self):
+        """Set semester, year, current_courses, and course_id from user config
+           and CLI options"""
+        
+        self.semester = self.get_config_option('current_semester',
+                                               validators.semester)
+        self.year = self.get_config_option('current_year', validators.year)
+        self.current_courses = user_config.current_courses
+        course_num = self.get_config_option('default_course',
+                                            validators.course_number)
+        
+        if not (self.db_connection and self.semester and self.year):
+            # don't bother looking for a course without a semester and year
+            # (but try otherwise, because these might identify one uniquely)
+            return
+        
+        try:
+            self.course_id = db.ensure_unique(
+                db.select_courses(self.db_connection,
+                                  semester=self.semester,
+                                  year=self.year,
+                                  number=course_num))
+        except (db.NoRecordsFound, db.MultipleRecordsFound):
+            sys.stderr.write("Unable to locate a unique default course; "
                              "ignoring.\n")
             
             
-    def set_default_assignment(self):
-        "Set assignment_id using user_config.default_assignment"
-        # TODO: assignment_id should also be settable via command-line option
+    def initial_assignment_setup(self):
+        "Set assignment_id using user config and CLI options"
+        assignment_name = self.get_config_option('default_assignment',
+                                                 validators.assignment_name)
+        if not (self.db_connection and self.course_id and assignment_name):
+            return
+        
         try:
             self.assignment_id = db.ensure_unique(
                 db.select_assignments(self.db_connection,
                                       course_id=self.course_id,
-                                      name=user_config.default_assignment))
-        except (AttributeError, db.NoRecordsFound, db.MultipleRecordsFound):
-            # AttributeError covers case where self.db_connection uninitialized
-            sys.stderr.write("Unable to locate a unique default assignment;"
+                                      name=assignment_name))
+        except (db.NoRecordsFound, db.MultipleRecordsFound):
+            sys.stderr.write("Unable to locate a unique default assignment; "
                              "ignoring.\n")
         
 
@@ -203,18 +246,20 @@ class SimpleUI(BaseUI):
             print ("Enter student data to lookup or create student. "
                    "Search uses fuzzy matching on name and email fields.\n"
                    "Use Ctrl-C to stop search and select from list.")
-            sid = typed_input("Enter SID: ", db.sid, default='')
+            sid = typed_input("Enter SID: ", validators.sid, default='')
             students = db.select_students(self.db_connection, sid=sid)
             quit_if_unique(students)
 
-            last_name = typed_input("Enter last name: ", db.name, default='')
+            last_name = typed_input("Enter last name: ", validators.name,
+                                    default='')
             students = db.select_students(self.db_connection,
                                           sid=sid,
                                           last_name=last_name,
                                           fuzzy=True)
             quit_if_unique(students)
             
-            first_name = typed_input("Enter first name: ", db.name, default='')
+            first_name = typed_input("Enter first name: ", validators.name,
+                                     default='')
             students = db.select_students(self.db_connection,
                                           sid=sid,
                                           last_name=last_name,
@@ -222,7 +267,7 @@ class SimpleUI(BaseUI):
                                           fuzzy=True)
             quit_if_unique(students)
 
-            email = typed_input("Enter email: ", db.email, default='')
+            email = typed_input("Enter email: ", validators.email, default='')
             students = db.select_students(self.db_connection,
                                           sid=sid,
                                           last_name=last_name,
@@ -291,6 +336,10 @@ class SimpleUI(BaseUI):
                  #self.export_grades,
                  self.exit])
 
+            # commit after successful completion of any top-level action
+            # to avoid data-loss
+            self.db_connection.commit()
+
            
     @require('db_connection', change_database,
              "A database connection is required to change the current course.")
@@ -312,10 +361,12 @@ class SimpleUI(BaseUI):
            Lookup an existing course in the database by semester, name, or number.
         """
         print "(Press Enter to skip a given search criterion)"
-        year = typed_input("Enter year: ", db.year, default='') or None
-        semester = typed_input("Enter semester: ", db.semester, default='') or None
-        course_num = typed_input("Enter course number: ", str) or None
-        course_name = typed_input("Enter course name: ", str) or None
+        year = typed_input("Enter year: ", validators.year, default='') 
+        semester = typed_input("Enter semester: ", validators.semester,
+                               default='') 
+        course_num = typed_input("Enter course number: ",
+                                 validators.course_number) 
+        course_name = typed_input("Enter course name: ", validators.course_name)
 
         courses = db.select_courses(self.db_connection,
                                     year=year, semester=semester,
@@ -344,10 +395,12 @@ class SimpleUI(BaseUI):
            Add a new course to the database and select it as the current
            course.
         """
-        year = typed_input("Enter year: ", db.year)
-        semester = typed_input("Enter semester: ", db.semester)
-        course_num = typed_input("Enter course number: ", str)
-        course_name = typed_input("Enter course name: ", str)
+        year = typed_input("Enter year: ", validators.year)
+        semester = typed_input("Enter semester: ", validators.semester)
+        course_num = typed_input("Enter course number: ",
+                                 validators.course_number)
+        course_name = typed_input("Enter course name: ",
+                                  validators.course_name)
 
         course_id = db.create_course(
             self.db_connection,
@@ -403,11 +456,12 @@ class SimpleUI(BaseUI):
         """Create a new assignment.
            Add a new assignment to the database and select it as the current assignment.
         """
-        name = typed_input("Enter assignment name: ", str)
+        name = typed_input("Enter assignment name: ", validators.assignment_name)
         description = typed_input("Enter description: ", str, default='')
-        due_date = typed_input("Enter due date (YYYY-MM-DD): ", db.date)
-        grade_type = typed_input("Enter grade type: ", str)
-        weight = typed_input("Enter weight (as decimal): ", float)
+        due_date = typed_input("Enter due date (YYYY-MM-DD): ", validators.date)
+        grade_type = typed_input("Enter grade type: ", validators.grade_type)
+        weight = typed_input("Enter weight (as decimal): ",
+                             validators.grade_weight)
 
         self.assignment_id = db.create_assignment(
             self.db_connection,
@@ -426,6 +480,8 @@ class SimpleUI(BaseUI):
         """Enter grades.
            Enter grades for the current assignment for individual students.
         """
+        # TODO: select grade validator based on assignment type
+        # _, __, = select_assignments(self.db_connection, assignment_id=self.assignment_id)
         print ""
         print "Use Control-C to finish entering grades."
         while True:
@@ -492,7 +548,8 @@ class SimpleUI(BaseUI):
                                    deleter=lambda s: None)
 
         for s in students:
-            s.pop('full_name') # name should now be properly split into last/first
+            if 'full_name' in s:
+                s.pop('full_name') # name should now be properly split 
             try:
                 s['student_id'] = db.get_student_id(self.db_connection,
                                                     sid=s['sid'],
@@ -676,7 +733,7 @@ class SimpleUI(BaseUI):
         else:
             prompt = "Which action? (enter a number): "
 
-        validator = lambda s: db.int_in_range(s, 0, len(actions))
+        validator = lambda s: validators.int_in_range(s, 0, len(actions))
         i = typed_input(prompt, validator,
                         default=actions.index(default) if default in actions else None)
         print "" # visually separate menu and selection 
@@ -713,7 +770,7 @@ class SimpleUI(BaseUI):
             max_index += 1
             print menu_format.format(max_index, "None of the above")
 
-        validator = lambda s: db.int_in_range(s, 0, max_index+1)
+        validator = lambda s: validators.int_in_range(s, 0, max_index+1)
             
         idx = typed_input("Which option? (enter a number): ", validator)
         print "" # visually separate menu and selection input 
@@ -747,13 +804,13 @@ class SimpleUI(BaseUI):
             s = s.strip().lower()
             if s.startswith('d'):
                 action = 'd'
-                idx = db.int_in_range(s[1:], 0, len(editable_rows)+1)
+                idx = validators.int_in_range(s[1:], 0, len(editable_rows)+1)
             elif s.startswith('i'):
                 action = 'i'
                 idx = None
             else:
                 action = 'e'
-                idx = db.int_in_range(s, 0, len(editable_rows)+1)
+                idx = validators.int_in_range(s, 0, len(editable_rows)+1)
             return action, idx
                 
         while True:
@@ -844,8 +901,8 @@ class SimpleUI(BaseUI):
             raise ValueError("You may not pass both from_dict and from_row")
 
         db_fields = ['student_id', 'last_name', 'first_name', 'sid', 'email']
-        validators = {'last_name': db.name, 'first_name': db.name,
-                      'sid': db.sid, 'email': db.email}
+        vlds = {'last_name': validators.name, 'first_name': validators.name,
+                'sid': validators.sid, 'email': validators.email}
         d = {}
         for i, f in enumerate(db_fields):
             if from_row:
@@ -855,7 +912,7 @@ class SimpleUI(BaseUI):
             else:
                 d[f] = None
                 
-        return self.edit_dict(d, validators=validators, skip=['student_id'])
+        return self.edit_dict(d, validators=vlds, skip=['student_id'])
         
     def print_course_info(self):
         "Prints information about the currently selected course"

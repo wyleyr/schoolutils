@@ -8,6 +8,7 @@
        can't be in Python identifiers ('-', '.')
      + configuration must include a function that maps course rows to
        grading functions?
+   - I've gone with the naming convention for now.  Let's see how it works.
 ** DONE [#A] Support for email in students table		      :db:ui:
 ** CANCELED [#B] Support for middle name in students table		 :db:
    I've decided the right thing to do here is to leave middle names
@@ -59,11 +60,24 @@
    pip installs examples to /usr/local/share/schoolutils/examples.
    No idea if it works, or how, on Windows or other Unixes.  May need
    to revisit in the future.
-** TODO [#A] Write docs for initial release!				:doc:
+** DONE [#A] Write docs for initial release!				:doc:
 ** TODO [#D] Make compatible with Python 3			  :packaging:
-** TODO [#A] Figure out the best thing to do with user validators     :ui:db:
+** DONE [#A] Figure out the best thing to do with user validators     :ui:db:
+   useful validators include:
+   - sid
+   - course_num
+   - assignment_name
+   what's the proper behavior here?  should db module import user_validators,
+   and wrap the appropriate validator in its own version?
+   e.g.
+   from schoolutils.config import user_validators
+   def sid(s):
+       if user_validators.sid:
+          return user_validators.sid(s)
+       else:
+          # ...
 ** TODO [#B] Interfaces to edit existing assignments, courses	    :ui:edit:
-** TODO [#A] Make executable scripts with CLI options		     :ui:bin:
+** DONE [#A] Make executable scripts with CLI options		     :ui:bin:
    - bin/grade: start the grader
      options:
      + -a "Paper 1" : select assignment
@@ -74,6 +88,19 @@
      + -x : export grades
 ** TODO [#B] Interface for exporting (sorted) lists of grades	  :ui:export:
 ** TODO [#A] Test and fix nested KeyboardInterrupt loop breakout	 :ui:
+** TODO [#B] Figure out institution setup				 :ui:
+   - need an API definition for institution modules
+     + validators?
+     + csv formats?
+   - institution var in user_config
+   - import user_institution module in config? 
+** TODO [#B] Improve change_database, change_course, change_assignment, etc. :ui:
+   - edge case: should not have to retype db path if provided on CLI
+     but no database exists there yet
+   - implement current_courses option
+   - incremental search for course, assignment?
+   - calculate_all_grades interface to loop over all current courses
+   
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so

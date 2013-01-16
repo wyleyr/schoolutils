@@ -45,9 +45,9 @@ Configuration
 It isn't necessary to configure schoolutils, but it will be faster to
 use if you do.  The command-line UI expects to find configuration
 files in the ``.schoolutils`` directory of your home directory.  You
-should create two Python modules there: ``config.py`` and
-``calculators.py``.  Sample configuration files are included in the
-``examples`` directory of the source package::
+should create three Python modules there: ``config.py``,
+``calculators.py``, and ``validators.py``.  Sample configuration files
+are included in the ``examples`` directory of the source package::
 
   $ mkdir ~/.schoolutils
   $ cp path/to/schoolutils_source/examples/*.py ~/.schoolutils
@@ -109,7 +109,7 @@ Entered vs. calculated grades
   it will (hopefully!) save you some work if you do.
   
 Grade calculation function
-  A grade calculation function is a function you define, in your
+  A grade calculation function is a function you define in your
   ``calculators.py`` module.  This function should calculate the
   calculated grades for a single student on the basis of entered
   grades.  You should define one grade calculation function per
@@ -134,6 +134,19 @@ Grade calculation function
   new key and value for each calculated grade.  For more information,
   see the example ``calculators.py`` module.
 
+Validator function
+   A validator function is a function you define in your
+   ``validators.py`` module.  It prepares data that you type into the
+   user interface to be saved to the database.  This function should
+   accept a string and either return an appropriate value or raise a
+   Python ``ValueError``.  If a validator raises a ``ValueError``, the
+   user interface asks you to re-enter the value until you type one
+   that validates. For example, the ``letter_grade`` validator ensures
+   that any string passed to it is a letter grade, so that you can't
+   save a letter grade of 'W' by mistake.
+
+   See the sample ``validators.py`` module for more information and a
+   list of the validators you can define.
 
 Command-line options
 --------------------
