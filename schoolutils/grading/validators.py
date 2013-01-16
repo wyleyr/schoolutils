@@ -71,10 +71,10 @@ def grade_type(s):
     """Ensure s is a valid grade type.
 
        By default, converts s to lowercase and ensures it is one of
-       'letter', 'points', or 'percentage'.
+       'letter', '4points', 'points', or 'percentage'.
     """
     t = s.strip().lower()
-    if t not in ['letter', 'points', 'percentage']:
+    if t not in ['letter', '4points', 'points', 'percentage']:
         raise ValueError("Not a grade type: %s" % s)
 
     return t
