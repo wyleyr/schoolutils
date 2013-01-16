@@ -21,7 +21,7 @@ User interfaces for grading utilities.
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 # 02110-1301, USA.
 
-import os, sqlite3
+import os, sys, sqlite3
 
 from schoolutils.config import user_config, user_calculators
 from schoolutils.grading import db
@@ -51,54 +51,95 @@ def require(attribute, callback, message):
     return method_factory
 
 class BaseUI(object):
-    def __init__(self):
-        self.db_file = file_path(user_config.gradedb_file)
-        if self.db_file and os.path.exists(self.db_file):
-            self.db_connection = sqlite3.connect(self.db_file)
+    def __init__(self, options=None):
+        """Initialize grading program UI.
+           options, if provided, should be an options structure produced by
+             optparse
+        """
+        if options:
+            self.cli_options = options
         else:
-            self.db_connection = None
+            self.cli_options = None
+            
         
-        self.semester = user_config.current_semester 
-        self.year = user_config.current_year 
-        self.current_courses = user_config.current_courses
-
+        self.semester = None
+        self.year = None
+        self.current_courses = []
         self.course_id = None
         self.assignment_id = None
         self.student_id = None
 
-        if user_config.default_course[0] and self.db_connection:
-            self.set_default_course()
-        if user_config.default_assignment and self.db_connection:
-            self.set_default_assignment()
-            
-    def set_default_course(self):
-        "Set course_id using user_config.default_course"
-        # TODO: course_id should also be settable via command line option
-        # TODO: fallback: if current_year and current_semester determine a unique
-        # course, use that
-        sem, yr, num = user_config.default_course
+        self.initial_database_setup()
+        self.initial_course_setup()
+        self.initial_assignment_setup()
+
+        
+    def get_config_option(self, option_name, validator, default=None):
+        """Return the appropriate config value from CLI options or user config.
+           option_name should be an attribute to look for on both the options
+             object and the user_config module.  CLI options override user_config
+             values.
+           validator will be applied to the value.
+           Returns the validated value, or default if option is not
+           supplied by the user or the user-supplied value does not
+           pass validation.
+        """
+        val = (getattr(self.cli_options, option_name, None) or
+               getattr(user_config, option_name, default))
         try:
-            self.course_id = db.ensure_unique(db.select_courses(self.db_connection,
-                                                                semester=sem,
-                                                                year=yr,
-                                                                number=num))
-        except (AttributeError, db.NoRecordsFound, db.MultipleRecordsFound):
-            # AttributeError covers case where self.db_connection uninitialized
-            sys.stderr.write("Unable to locate a unique default course;"
+            return validator(val)
+        except ValueError:
+            return default
+
+    def initial_database_setup(self):
+        "Set db_file and db_connection from user config and CLI options"
+        self.db_file = self.get_config_option('gradedb_file', file_path)
+        
+        if self.db_file and os.path.exists(self.db_file):
+            self.db_connection = sqlite3.connect(self.db_file)
+        else:
+            self.db_connection = None
+
+            
+    def initial_course_setup(self):
+        """Set semester, year, current_courses, and course_id from user config
+           and CLI options"""
+        
+        self.semester = self.get_config_option('current_semester', db.semester)
+        self.year = self.get_config_option('current_year', db.year)
+        self.current_courses = user_config.current_courses
+        course_num = self.get_config_option('default_course', db.course_number)
+        
+        if not (self.db_connection and self.semester and self.year):
+            # don't bother looking for a course without a semester and year
+            # (but try otherwise, because these might identify one uniquely)
+            return
+        
+        try:
+            self.course_id = db.ensure_unique(
+                db.select_courses(self.db_connection,
+                                  semester=self.semester,
+                                  year=self.year,
+                                  number=course_num))
+        except (db.NoRecordsFound, db.MultipleRecordsFound):
+            sys.stderr.write("Unable to locate a unique default course; "
                              "ignoring.\n")
             
             
-    def set_default_assignment(self):
-        "Set assignment_id using user_config.default_assignment"
-        # TODO: assignment_id should also be settable via command-line option
+    def initial_assignment_setup(self):
+        "Set assignment_id using user config and CLI options"
+        assignment_name = self.get_config_option('default_assignment',
+                                                 db.assignment_name)
+        if not (self.db_connection and self.course_id and assignment_name):
+            return
+        
         try:
             self.assignment_id = db.ensure_unique(
                 db.select_assignments(self.db_connection,
                                       course_id=self.course_id,
-                                      name=user_config.default_assignment))
-        except (AttributeError, db.NoRecordsFound, db.MultipleRecordsFound):
-            # AttributeError covers case where self.db_connection uninitialized
-            sys.stderr.write("Unable to locate a unique default assignment;"
+                                      name=assignment_name))
+        except (db.NoRecordsFound, db.MultipleRecordsFound):
+            sys.stderr.write("Unable to locate a unique default assignment; "
                              "ignoring.\n")
         
 

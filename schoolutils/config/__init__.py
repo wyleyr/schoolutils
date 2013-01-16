@@ -36,8 +36,8 @@ CONFIG_DEFAULTS = {
     'current_semester': None,
     'current_year': datetime.date.today().year,
     'current_courses': [],
-    'default_course': (None, None, None), # semester, year, course_num
-    'default_assignment': None,
+    'default_course': '', 
+    'default_assignment': '',
 }
 
 def add_defaults(m, defaults):

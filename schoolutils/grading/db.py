@@ -842,13 +842,31 @@ def date(s):
     return datetime.date(y, m, d)
 
 def sid(s):
-    """Ensure s is a valid SID.  This function is just an alias for
-       str(); provide your own in your validators.py
+    """Ensure s is a valid SID.
+
+       By default, this function is just an alias for str(); provide
+       your own in your validators.py
+    """
+    return str(s)
+
+def course_number(s):
+    """Ensure s is a valid course number.
+
+       By default, this function is just an alias for str(); provide
+       your own in your validators.py
+    """
+    return str(s)
+
+def assignment_name(s):
+    """Ensure s is a valid assignment name.
+
+       By default, this function is just an alias for str(); provide
+       your own in your validators.py
     """
     return str(s)
 
 def name(s):
-    """Ensure s looks like a name"""
+    """Ensure s looks like a name."""
     return s.strip().upper()
 
 def email(s):
