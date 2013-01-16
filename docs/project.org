@@ -93,6 +93,13 @@
      + csv formats?
    - institution var in user_config
    - import user_institution module in config? 
+** TODO [#B] Improve change_database, change_course, change_assignment, etc. :ui:
+   - edge case: should not have to retype db path if provided on CLI
+     but no database exists there yet
+   - implement current_courses option
+   - incremental search for course, assignment?
+   - calculate_all_grades interface to loop over all current courses
+   
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so
