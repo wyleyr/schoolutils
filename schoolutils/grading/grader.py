@@ -23,25 +23,25 @@ Utilities for calculating and reporting grades
 
 import csv, os, sys, math, optparse
 
-from schoolutils.config import user_calculators
-
 #
 # Top-level interfaces
 #
 # Each interface accepts an input file handle, an output file
 # handle, and an options structure
-def csv_to_csv(in_file, out_file, options):
-    "Interface for reading and writing CSV files"        
-    fieldnames, rows = read_csv(in_file)
 
-    # TODO: user_calculators need not provide a single
-    # calculate_grade...
-    calculated_rows = [user_calculators.calculate_grade(row) for row in rows]
-    
-    if options.sort_field:
-        calculated_rows = sort_grade_list(calculated_rows, options.sort_field)
-        
-    write_csv(out_file, calculated_rows[0].keys(), calculated_rows)
+# TODO: can't import user_calculators here, because user_calculators
+# might very well be importing this module!  This code needs to move to
+# a UI module
+# def csv_to_csv(in_file, out_file, options):
+#     "Interface for reading and writing CSV files"        
+#     fieldnames, rows = read_csv(in_file)
+#
+#     calculated_rows = [user_calculators.calculate_grade(row) for row in rows]
+#    
+#     if options.sort_field:
+#         calculated_rows = sort_grade_list(calculated_rows, options.sort_field)
+#        
+#     write_csv(out_file, calculated_rows[0].keys(), calculated_rows)
 
 #
 # Grade-list operations and reporting functions
