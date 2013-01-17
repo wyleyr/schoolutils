@@ -94,7 +94,6 @@ class BaseUI(object):
     def initial_database_setup(self):
         "Set db_file and db_connection from user config and CLI options"
         self.db_file = self.get_config_option('gradedb_file', file_path)
-        
         if self.db_file and os.path.exists(self.db_file):
             self.db_connection = sqlite3.connect(self.db_file)
         else:
@@ -987,7 +986,10 @@ def file_path(s):
     """Convert a string to a file path.
        The passed string may contain '~' and will be expanded to an absolute
        path."""
-    return os.path.abspath(os.path.expanduser(s))
+    fp = s.strip()
+    if not fp:
+        raise ValueError("File path may not be empty")
+    return os.path.abspath(os.path.expanduser(fp))
 
 def yn_bool(s):
     """Convert a yes/no string to a boolean.
