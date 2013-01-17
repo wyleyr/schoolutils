@@ -105,6 +105,9 @@
    
 ** TODO [#A] Fix grade calculation when grades for a given student are missing
    
+** TODO [#A] Testing framework					    :testing:
+   - need to write tests for bugs, automate testing
+   - use virtualenv to test empty configuration
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so
