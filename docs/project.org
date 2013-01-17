@@ -29,8 +29,8 @@
  - for individual students
  - measure improvement
 ** TODO [#C] PGP encryption/decryption of database file		      :ui:db:
-** TODO [#B] Export grades to gradebook format		   :bspace:ui:export:
-** INPROGRESS [#C] distribute on PyPI				  :packaging:
+** TODO [#A] Export grades to gradebook format		   :bspace:ui:export:
+** DONE [#C] distribute on PyPI					  :packaging:
    - need to remove/abstract out Berkeley-specific code, like
      db.sid validator and bspace module
    - better keywords/metadata
@@ -76,7 +76,9 @@
           return user_validators.sid(s)
        else:
           # ...
-** TODO [#B] Interfaces to edit existing assignments, courses	    :ui:edit:
+** TODO [#A] Interfaces to edit existing assignments, courses, grades :ui:edit:
+   - need to be able to modify and delete these
+     
 ** DONE [#A] Make executable scripts with CLI options		     :ui:bin:
    - bin/grade: start the grader
      options:
@@ -100,6 +102,8 @@
    - implement current_courses option
    - incremental search for course, assignment?
    - calculate_all_grades interface to loop over all current courses
+   
+** TODO [#A] Fix grade calculation when grades for a given student are missing
    
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
