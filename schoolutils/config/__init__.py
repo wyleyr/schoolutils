@@ -33,7 +33,7 @@ CONFIG_DEFAULTS = {
     'email': '',
     'institution': '',
     'gradedb_file': '',
-    'current_semester': None,
+    'current_semester': '',
     'current_year': datetime.date.today().year,
     'current_courses': [],
     'default_course': '', 
@@ -55,7 +55,8 @@ def user_modules():
                                                    USER_CONFIG_FILE),
                                    CONFIG_DEFAULTS)
     except (IOError, ImportError):
-        user_config = imp.new_module('user_config')
+        user_config = add_defaults(imp.new_module('user_config'),
+                                   CONFIG_DEFAULTS)
         
     try:
         user_calculators = imp.load_source('user_calculators',
