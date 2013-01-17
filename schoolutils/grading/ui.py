@@ -84,8 +84,8 @@ class BaseUI(object):
            supplied by the user or the user-supplied value does not
            pass validation.
         """
-        val = (getattr(self.cli_options, option_name, None) or
-               getattr(user_config, option_name, default))
+        val = (getattr(self.cli_options, option_name, '') or
+               getattr(user_config, option_name, ''))
         try:
             return validator(val)
         except ValueError:
