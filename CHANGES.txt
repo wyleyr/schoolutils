@@ -1,3 +1,4 @@
+v0.1.4, 2013-01-17 -- Fix some bugs affecting startup without config files
 v0.1.3, 2013-01-15 -- Add CLI options, user validators; update README
 v0.1.2, 2013-01-15 -- Add 'grade' script, README documentation 
 v0.1.1, 2013-01-14 -- setup.py: Fix installation of examples/ and add classifiers
