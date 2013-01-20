@@ -479,15 +479,17 @@ class SimpleUI(BaseUI):
         """Enter grades.
            Enter grades for the current assignment for individual students.
         """
-        # TODO: select grade validator based on assignment type
-        # _, __, = select_assignments(self.db_connection, assignment_id=self.assignment_id)
+        grade_type = db.select_assignments(self.db_connection,
+                                           assignment_id=self.assignment_id)[0][4]
+        grade_validator = validators.validator_for_grade_type(grade_type)
+        
         print ""
         print "Use Control-C to finish entering grades."
         while True:
             try:
                 student_id, last_name, first_name, sid, _ = self.get_student()
                 grade_id = None
-                grade_val = typed_input("Enter grade value: ", str)
+                grade_val = typed_input("Enter grade value: ", grade_validator)
                 existing_grades = db.select_grades(self.db_connection,
                                                    student_id=student_id,
                                                    course_id=self.course_id,

@@ -192,10 +192,12 @@ def select_assignments(db_connection, assignment_id=None, course_id=None,
                        year=None, semester=None, name=None):
     """Return a result set of assignments.
        The rows in the result set have the format:
-       (assignment_id, course_id, assignment_name, due_date)
+       (assignment_id, course_id, assignment_name, due_date, grade_type, weight,
+         description)
     """
     base_query = """
-    SELECT assignments.id, courses.id, assignments.name, assignments.due_date
+    SELECT assignments.id, courses.id, assignments.name, assignments.due_date,
+           assignments.grade_type, assignments.weight, assignments.description
     FROM assignments, courses
     ON assignments.course_id=courses.id
     %(where)s
