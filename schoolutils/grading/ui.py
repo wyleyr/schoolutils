@@ -552,8 +552,6 @@ class SimpleUI(BaseUI):
                                    deleter=lambda s: None)
 
         for s in students:
-            if 'full_name' in s:
-                s.pop('full_name') # name should now be properly split 
             try:
                 s['student_id'] = db.get_student_id(self.db_connection,
                                                     sid=s['sid'],
@@ -563,7 +561,11 @@ class SimpleUI(BaseUI):
                 s['student_id'] = None
 
             student_id = db.create_or_update_student(
-                self.db_connection, **s)
+                self.db_connection,
+                sid=s['sid'],
+                first_name=s['first_name'],
+                last_name=s['last_name'],
+                email=s['email'])
             course_member_id = db.create_course_member(
                 self.db_connection,
                 student_id=student_id,
