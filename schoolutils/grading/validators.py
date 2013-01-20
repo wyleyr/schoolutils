@@ -192,3 +192,25 @@ def email(s):
     if '@' not in e:
         raise ValueError("%s does not appear to be an email address" % s)
     return e
+
+# Other helpers:
+def validator_for_grade_type(gt):
+    """Return a validator for grades with grade type gt.
+
+       This function maps grade types to validators as follows:
+         'letter': validators.letter_grade
+         '4points': validators.four_point_grade
+         'percentage': validators.percentage_grade
+         'points': int
+         any other type: str 
+    """
+    type_map = {
+        'letter': letter_grade,
+        '4points': four_point_grade,
+        'percentage': percentage_grade,
+        'points': int
+    }
+    try:
+        return type_map[gt]
+    except KeyError:
+        return str
