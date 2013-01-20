@@ -459,8 +459,11 @@ class SimpleUI(BaseUI):
         description = typed_input("Enter description: ", str, default='')
         due_date = typed_input("Enter due date (YYYY-MM-DD): ", validators.date)
         grade_type = typed_input("Enter grade type: ", validators.grade_type)
-        weight = typed_input("Enter weight (as decimal): ",
-                             validators.grade_weight)
+        if grade_type == "points":
+            weight_prompt = "Enter number of possible points: "
+        else:
+            weight_prompt = "Enter grade weight (as decimal fraction of 1): "
+        weight = typed_input(weight_prompt, validators.grade_weight)
 
         self.assignment_id = db.create_assignment(
             self.db_connection,
