@@ -62,6 +62,9 @@
    to revisit in the future.
 ** DONE [#A] Write docs for initial release!				:doc:
 ** TODO [#D] Make compatible with Python 3			  :packaging:
+   - actually we are not far off, here
+   - 2to3 reveals that pretty much the only changes that need to be made
+     are for print statements (<2013-01-19 Sat>)
 ** DONE [#A] Figure out the best thing to do with user validators     :ui:db:
    useful validators include:
    - sid
@@ -96,6 +99,31 @@
      + csv formats?
    - institution var in user_config
    - import user_institution module in config? 
+   
+   Proposal:
+   1) Institution modules provide the following:
+      - a UI subclass that provides a few specific methods, and can
+	override any of the actions of the BaseUI/SimpleUI classes
+      - a validators module that will be loaded when the user
+        specifies an institution but does not provide a validators.py
+   2) The institution UI subclass API:
+      - csv_to_student_dicts(filename)
+      - student_dicts_to_csv(filename, student_dicts)
+      - csv_to_grade_dicts(filename)
+      - grade_dicts_to_csv(filename, grade_dicts)
+   3) Institution modules must (in __init__.py) export this UI
+      subclass as InstitutionUI
+   4) In schoolutils.config, we:
+      - import user_config
+      - if user_config has 'institution' attribute, 
+	user_institution = __import__(user_config.institution, fromlist=['schoolutils', 'institutions'])
+	UIClass = __import__('InstitutionUI', fromlist=['schoolutils',
+                             'institutions', user_config.institution])
+      - use user_config.institution to find a validators module, if
+        the user provides none
+   5) in bin/grade, we:
+      - run schoolutils.config.UIClass().main_loop
+
 ** TODO [#B] Improve change_database, change_course, change_assignment, etc. :ui:
    - edge case: should not have to retype db path if provided on CLI
      but no database exists there yet
@@ -104,10 +132,40 @@
    - calculate_all_grades interface to loop over all current courses
    
 ** TODO [#A] Fix grade calculation when grades for a given student are missing
-   
 ** TODO [#A] Testing framework					    :testing:
    - need to write tests for bugs, automate testing
    - use virtualenv to test empty configuration
+** WAITING [#B] Distinguish weight vs. possible points?		      :ui:db:
+   - currently, assignments.weight field is intended to be interpreted
+     as either percentage of final grade (for most grade types) OR
+     number of possible points (for 'points' grades)
+   - but this scheme does not permit giving 'points' grades
+     fractional weights of a final grade -- in effect it assumes that
+     either all the grades in a course are of type 'points' or none are.
+   - do we need a way around this?
+     + Yes: the program is not complete unless there are library
+       functions for calculating grades in a course with mixed grade types
+     + No: grade calculation functions can look up the weight fields
+       on the various assignments (or hard code them) and compute
+       accordingly, and that's the user's responsibility
+     + Think I'm in the 'No' camp for now
+** TODO [#B] Re-architect database selections			      :ui:db:
+   - make use of connection.row_factory, perhaps sqlite3.Row
+   - return cursors instead of always calling fetchall()?
+   - main reasons this is needed:
+     1) relying on fixed positions for fields produced by select_*
+        functions is extremely(!) fragile
+     2) GradeDict does not seem to be the right abstraction; need a better
+	way for user-defined calculators to get all the right information
+	they need about student grades (and locate it in the data
+        passed in) without needing to hit the db.  It would be nice
+        to do something like
+	def my_grade_calculator(grade_rows):
+	    weights = map(lambda r: r['weight'], grade_rows)
+	    grades = map(lambda r: r['value'], grade_rows)
+	    # ...
+
+** TODO [#C] Replace db.last_insert_rowid() with native sqlite3 call 	 :db:
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so
