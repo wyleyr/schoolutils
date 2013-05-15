@@ -21,7 +21,7 @@ User interfaces for grading utilities.
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 # 02110-1301, USA.
 
-import os, sys, sqlite3
+import os, sys, sqlite3, csv
 
 from schoolutils.config import user_config, user_calculators
 from schoolutils.grading import db, validators
@@ -332,7 +332,7 @@ class SimpleUI(BaseUI):
                  self.enter_grades,
                  self.calculate_grades,
                  #self.import_grades,
-                 #self.export_grades,
+                 self.export_grades,
                  self.exit])
 
             # commit after successful completion of any top-level action
@@ -655,9 +655,81 @@ class SimpleUI(BaseUI):
     def import_grades(self):
         pass
 
+    @require('course_id', change_course,
+             "A selected course is required to export grades.")
     def export_grades(self):
-        pass
+        """Export grades.
+           Export grades for the current course to a CSV file.
+        """
+        out_file_name = typed_input("Enter a path for grade export: ", file_path)
+        if os.path.exists(out_file_name):
+            print "Warning: file %s exists." % out_file_name
+            overwrite = typed_input("Overwrite? (Y/N) ", yn_bool)
+            if not overwrite:
+                print "Abort."
+                return
 
+        out_file = open(out_file_name, 'w')
+        
+        # format, for now:
+        # last_name + first_name, sid, grade1, grade2, grade3...
+        assignments = db.select_assignments(self.db_connection,
+                                            course_id=self.course_id)
+        assignment_names = [a[2] for a in assignments]
+        header = ["Name", "SID"] + assignment_names
+        writer = csv.DictWriter(out_file, header)
+        
+        students = db.select_students(self.db_connection,
+                                      course_id=self.course_id)
+
+        # writeheader() became available in Python 2.7:
+        try:
+            writer.writeheader()
+        except AttributeError:
+            writer.writerow(dict(zip(header,header)))
+
+        for s in students:
+            row = {}
+            student_id, last_name, first_name, sid, email = s
+           
+            row["Name"] = "%s, %s" % (last_name, first_name)
+            row["SID"] = sid
+            for a in assignments:
+                # TODO: we're hitting the db (# of assignments * # of
+                # students) times here -- possibly on the order of 200
+                # times per course.  This is the simplest
+                # implementation for now but probably very slow; this
+                # loop is low-hanging fruit for optimization
+                assignment_id = a[0]
+                assignment_name = a[2]
+                grades = db.select_grades(self.db_connection,
+                                          student_id=student_id,
+                                          assignment_id=assignment_id)
+                if len(grades) > 1:
+                    # TODO: we should use the most recently saved
+                    # grade value here (presently select_grades does
+                    # not return timestamps, but UI also disallows
+                    # multiple grades to be entered)
+                    print ("Warning: multiple grades found for student %s "
+                           "in assignment %s; using first in database" %
+                           (row["Name"], assignment_name))
+                    row[assignment_name] = grades[0][5]
+                elif len(grades) == 0:
+                    print ("Warning: no grades found for student %s "
+                           "in assignment %s; skipping" %
+                           (row["Name"], assignment_name))
+                    row[assignment_name] = None
+                else:
+                    row[assignment_name] = grades[0][5]
+                
+            try:
+                writer.writerow(row)
+            except IOError:
+                print ("Warning: could not write row to CSV: %r." % row)
+                continue
+
+        out_file.close()
+                
     @require('course_id', change_course,
              "A selected course is required to calculate grades.")
     def calculate_grades(self):
