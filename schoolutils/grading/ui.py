@@ -692,7 +692,7 @@ class SimpleUI(BaseUI):
             row = {}
             student_id, last_name, first_name, sid, email = s
            
-            row["Name"] = "%s, %s" % last_name, first_name
+            row["Name"] = "%s, %s" % (last_name, first_name)
             row["SID"] = sid
             for a in assignments:
                 # TODO: we're hitting the db (# of assignments * # of
