@@ -664,7 +664,7 @@ class SimpleUI(BaseUI):
         out_file_name = typed_input("Enter a path for grade export: ", file_path)
         if os.path.exists(out_file_name):
             print "Warning: file %s exists." % out_file_name
-            overwrite = typed_input("Overwrite? (Y/N)", yn_bool)
+            overwrite = typed_input("Overwrite? (Y/N) ", yn_bool)
             if not overwrite:
                 print "Abort."
                 return
