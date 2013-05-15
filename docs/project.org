@@ -132,6 +132,16 @@
    - calculate_all_grades interface to loop over all current courses
    
 ** TODO [#A] Fix grade calculation when grades for a given student are missing
+   - problem 1: if grades are missing, we crash with a KeyError
+   - problem 2: if user works around this by trying to use dictionary methods
+     on GradeDict, data corruption happens *really easily*
+     e.g. the following clobbered not just calculated grades, but ALL
+     grades for the given course:
+     
+    for k in assignments:
+        if k not in student_grades: # broken
+            student_grades[k] = 'F'
+
 ** TODO [#A] Testing framework					    :testing:
    - need to write tests for bugs, automate testing
    - use virtualenv to test empty configuration
@@ -176,3 +186,4 @@
      same name (or similar names with the _like version); but this edge
      case is rare enough that it probably won't happen for other
      reasons, so I won't fix it for now
+     
