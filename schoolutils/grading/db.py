@@ -480,8 +480,8 @@ def delete_course_members(db_connection, member_id=None, course_id=None,
 
     return num_changes(db_connection)
     
-def select_grades(db_connection, student_id=None, course_id=None,
-                  assignment_id=None):
+def select_grades(db_connection, grade_id=None, student_id=None,
+                  course_id=None, assignment_id=None):
     """Get a result set of grades for a given student or course.
        The rows in the result set have the format:
        (grade_id, student_id, course_id, assignment_id, assignment_name,
@@ -497,8 +497,8 @@ def select_grades(db_connection, student_id=None, course_id=None,
     """
      
     constraints, params = make_conjunction_clause(
-        ['students.id', 'assignments.course_id', 'assignments.id'],
-        [student_id, course_id, assignment_id])
+        ['grades.id', 'students.id', 'assignments.course_id', 'assignments.id'],
+        [grade_id, student_id, course_id, assignment_id])
     query = add_where_clause(base_query, constraints)
    
     return db_connection.execute(query, params).fetchall()
@@ -548,7 +548,31 @@ def create_or_update_grade(db_connection, grade_id=None, assignment_id=None,
     
     return last_insert_rowid(db_connection)
 
+def update_grade(db_connection, grade_id=None, value=None):
+    """Update a record of an existing grade.
+       Returns the id of the updated row.
+       
+       This function is, for now, intentionally hobbled: you can only
+       update a grade's value field, and you can only select a grade
+       by its id field.  (Thus you may only update one grade.)  The
+       timestamp will be automatically updated.
+    """
+    if not grade_id:
+        raise sqlite3.IntegrityError("grade_id is required to update a grade")
+    if not value:
+        raise sqlite3.IntegrityError("value is required to update a grade")
     
+    query = """
+    UPDATE grades
+    SET value=?, timestamp=?
+    WHERE id=?;
+    """
+    params = (value, datetime.datetime.now(), grade_id)
+    db_connection.execute(query, params)
+    
+    return grade_id
+
+   
 #
 # for interfacing with grading functions:
 # 

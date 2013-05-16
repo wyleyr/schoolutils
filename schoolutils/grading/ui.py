@@ -330,6 +330,7 @@ class SimpleUI(BaseUI):
                  self.import_students,
                  self.edit_student,
                  self.enter_grades,
+                 self.edit_grades,
                  self.calculate_grades,
                  #self.import_grades,
                  self.export_grades,
@@ -522,6 +523,105 @@ class SimpleUI(BaseUI):
                 break
             # TODO: shortcut here for changing to another assignment?
             # enter_grades_for_student method? (for a single student across all course assignments)
+
+    @require('db_connection', change_database,
+             "A database connection is required to edit grades.")
+    @require('course_id', change_course,
+             "A selected course is required to edit grades.")
+    def edit_grades(self):
+        """Edit grades.
+           Edit a table of grades for the current course.
+        """
+        assignments = db.select_assignments(self.db_connection,
+                                            course_id=self.course_id)
+        students = db.select_students(self.db_connection,
+                                      course_id=self.course_id)
+        
+        row_fmt =  "{last_name: <15s} {first_name: <20s}  {grades: <60s}"
+        header = row_fmt.format(last_name="Last name", first_name="First name",
+                                # col headers are assignment names
+                                grades="".join("{0: <10s} ".format(a[2])
+                                               for a in assignments))
+
+        def grade_row_for_assignment(grades, assignment):
+            try:
+                # extract grade row which matches assignment id
+                row = filter(lambda g: g[3] == assignment[0], grades)[0]
+            except IndexError:
+                row = None
+            return row
+
+        def grade_val_for_assignment(grades, assignment):
+            try:
+                val = grade_row_for_assignment(grades, assignment)[5]
+            except TypeError: # if None is returned
+                val = None
+            return val
+                
+        def formatter(row):
+            last_name, first_name = row['student'][1], row['student'][2]
+            grades = row['grades']
+            grade_vals = [grade_val_for_assignment(grades, a) 
+                          for a in assignments]
+            grade_str = "".join("{0: <10s} ".format(str(v)) for v in grade_vals)
+            return row_fmt.format(last_name=last_name, first_name=first_name,
+                                  grades=grade_str)
+
+        def editor(row):
+            student_id, last_name, first_name, sid, email = row['student']
+            grades = row['grades']
+            
+            print "Editing grades for %s, %s." % (last_name, first_name)
+            
+            prompt = "New grade value for %s (default: %s): "
+            for a in assignments:
+                assignment_name = a[2]
+                old_row = grade_row_for_assignment(grades, a)
+                if old_row:
+                    old_val = old_row[5]
+                else:
+                    old_val = None
+                    
+                grade_validator = validators.validator_for_grade_type(a[4])
+
+                new_val = typed_input(prompt % (assignment_name, old_val),
+                                      grade_validator, default=old_val)
+                if new_val == old_val:
+                    continue
+                elif new_val and old_row:
+                    # update the existing grade value in the db
+                    grade_id = old_row[0]
+                    db.update_grade(self.db_connection, grade_id=grade_id,
+                                    value=new_val)
+                    # modify in place so changes appear in table view
+                    idx = grades.index(old_row)
+                    grades[idx] = db.select_grades(self.db_connection,
+                                                   grade_id=grade_id)[0]
+                elif new_val:
+                    # no existing grade value in db, so create one,
+                    # and add the row to the data used to generate the
+                    # editing table
+                    new_row_id = db.create_or_update_grade(self.db_connection,
+                                                           student_id=student_id,
+                                                           assignment_id=a[0],
+                                                           value=new_val)
+                    new_row = db.select_grades(self.db_connection,
+                                               grade_id=new_row_id)[0]
+                    row['grades'].append(new_row)
+                
+            return row
+ 
+        rows = []
+        for s in students:
+            rows.append({
+              'student': s,
+              'grades': db.select_grades(self.db_connection,
+                                         course_id=self.course_id,
+                                         student_id=s[0])
+            })
+    
+        self.edit_table(rows, header, formatter, editor=editor)
+        print "Grades updated successfully."
 
     @require('db_connection', change_database,
              "A database connection is required to import students.")
