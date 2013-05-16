@@ -537,10 +537,10 @@ class SimpleUI(BaseUI):
         students = db.select_students(self.db_connection,
                                       course_id=self.course_id)
         
-        row_fmt =  "{last_name: <15s}, {first_name: <15s}  {grades: <46s}"
+        row_fmt =  "{last_name: <15s} {first_name: <20s}  {grades: <60s}"
         header = row_fmt.format(last_name="Last name", first_name="First name",
                                 # col headers are assignment names
-                                grades="".join("{0: <8s} ".format(a[2])
+                                grades="".join("{0: <10s} ".format(a[2])
                                                for a in assignments))
         def formatter(row):
             last_name, first_name = row['student'][1], row['student'][2]
@@ -554,7 +554,7 @@ class SimpleUI(BaseUI):
                     val = "NONE"
                 grade_vals.append(val)
 
-            grade_str = "".join("{0: <8s} ".format(str(v)) for v in grade_vals)
+            grade_str = "".join("{0: <10s} ".format(str(v)) for v in grade_vals)
             return row_fmt.format(last_name=last_name, first_name=first_name,
                                   grades=grade_str)
 
