@@ -563,11 +563,12 @@ class SimpleUI(BaseUI):
  
         rows = []
         for s in students:
-            row['student'] = s
-            row['grades'] = db.select_grades(self.db_connection,
-                                             course_id=self.course_id,
-                                             student_id=s[0])
-            rows.append(row)
+            rows.append({
+              'student': s,
+              'grades': db.select_grades(self.db_connection,
+                                         course_id=self.course_id,
+                                         student_id=s[0])
+            })
     
         self.edit_table(rows, header, formatter, editor=editor)
         print "Grades updated successfully."
