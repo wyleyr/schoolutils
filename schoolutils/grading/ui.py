@@ -561,7 +561,7 @@ class SimpleUI(BaseUI):
         def formatter(row):
             last_name, first_name = row['student'][1], row['student'][2]
             grades = row['grades']
-            grade_vals = [grade_val_for_assignment(grades, a) or "NONE"
+            grade_vals = [grade_val_for_assignment(grades, a) 
                           for a in assignments]
             grade_str = "".join("{0: <10s} ".format(str(v)) for v in grade_vals)
             return row_fmt.format(last_name=last_name, first_name=first_name,
