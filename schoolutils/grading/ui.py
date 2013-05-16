@@ -330,6 +330,7 @@ class SimpleUI(BaseUI):
                  self.import_students,
                  self.edit_student,
                  self.enter_grades,
+                 self.edit_grades,
                  self.calculate_grades,
                  #self.import_grades,
                  self.export_grades,
@@ -522,6 +523,54 @@ class SimpleUI(BaseUI):
                 break
             # TODO: shortcut here for changing to another assignment?
             # enter_grades_for_student method? (for a single student across all course assignments)
+
+    @require('db_connection', change_database,
+             "A database connection is required to edit grades.")
+    @require('course_id', change_course,
+             "A selected course is required to edit grades.")
+    def edit_grades(self):
+        """Edit grades.
+           Edit a table of grades for the current course.
+        """
+        assignments = db.select_assignments(self.db_connection,
+                                            course_id=self.course_id)
+        students = db.select_students(self.db_connection,
+                                      course_id=self.course_id)
+        
+        row_fmt =  "{last_name: <15s}, {first_name: <20s}  {grades: <40s}"
+        header = row_fmt.format(last_name="Name", first_name="",
+                                # col headers are assignment names
+                                grades="".join(a[2] for a in assignments))
+        def formatter(row):
+            last_name, first_name = row['student'][1], row['student'][2]
+            grades = row['grades']
+            grade_vals = []
+            for a in assignments:
+                try:
+                    # extract grade value from row which matches assignment id
+                    val = filter(lambda g: g[3] == a[0], grades)[0][5]
+                except IndexError:
+                    val = "NONE"
+                grade_vals.append(val)
+
+            grade_str = "".join("{0: <8s} ".format(*v) for v in grade_vals)
+            return row_fmt.format(last_name=last_name, first_name=first_name,
+                                  grades=grade_str)
+
+        def editor(row):
+            # TODO
+            return row
+ 
+        rows = []
+        for s in students:
+            row['student'] = s
+            row['grades'] = db.select_grades(self.db_connection,
+                                             course_id=self.course_id,
+                                             student_id=s[0])
+            rows.append(row)
+    
+        self.edit_table(rows, header, formatter, editor=editor)
+        print "Grades updated successfully."
 
     @require('db_connection', change_database,
              "A database connection is required to import students.")
