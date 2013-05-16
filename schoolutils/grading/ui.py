@@ -542,24 +542,55 @@ class SimpleUI(BaseUI):
                                 # col headers are assignment names
                                 grades="".join("{0: <10s} ".format(a[2])
                                                for a in assignments))
+
+        def grade_row_for_assignment(grades, assignment):
+            try:
+                # extract grade row which matches assignment id
+                row = filter(lambda g: g[3] == assignment[0], grades)[0]
+            except IndexError:
+                row = None
+            return val
+
+        def grade_val_for_assignment(grades, assignment):
+            try:
+                val = grade_row_for_assignment(grades, assignment)[5]
+            except IndexError:
+                val = None
+            return val
+                
         def formatter(row):
             last_name, first_name = row['student'][1], row['student'][2]
             grades = row['grades']
-            grade_vals = []
-            for a in assignments:
-                try:
-                    # extract grade value from row which matches assignment id
-                    val = filter(lambda g: g[3] == a[0], grades)[0][5]
-                except IndexError:
-                    val = "NONE"
-                grade_vals.append(val)
-
+            grade_vals = [grade_val_for_assignment(grades, a) or "NONE"
+                          for a in assignments]
             grade_str = "".join("{0: <10s} ".format(str(v)) for v in grade_vals)
             return row_fmt.format(last_name=last_name, first_name=first_name,
                                   grades=grade_str)
 
         def editor(row):
-            # TODO
+            student_id, last_name, first_name, sid, email = row['student']
+            grades = row['grades']
+            
+            print "Editing grades for %s, %s." % (last_name, first_name)
+            
+            prompt = "New grade value for %s (default: %s): "
+            for a in assignments:
+                assignment_name = a[2]
+                old_row = grade_row_for_assignment('grades', a)
+                old_val = old_row[5]
+                grade_validator = validators.validator_for_grade_type(a[4])
+
+                new_val = typed_input(prompt % (assignment_name, old_val),
+                                      grade_validator, default=old_val)
+                if new_val == old_val:
+                    continue
+                else:
+                    grade_id = old_row[0]
+                    db.update_grade(self.db_connection, grade_id=grade_id,
+                                    value=new_val)
+                    # update in place so changes appear in table view
+                    old_row[5] = new_val
+                
             return row
  
         rows = []
