@@ -549,7 +549,7 @@ class SimpleUI(BaseUI):
                 row = filter(lambda g: g[3] == assignment[0], grades)[0]
             except IndexError:
                 row = None
-            return val
+            return row
 
         def grade_val_for_assignment(grades, assignment):
             try:
@@ -577,19 +577,35 @@ class SimpleUI(BaseUI):
             for a in assignments:
                 assignment_name = a[2]
                 old_row = grade_row_for_assignment('grades', a)
-                old_val = old_row[5]
+                if old_row:
+                    old_val = old_row[5]
+                else:
+                    old_val = None
+                    
                 grade_validator = validators.validator_for_grade_type(a[4])
 
                 new_val = typed_input(prompt % (assignment_name, old_val),
                                       grade_validator, default=old_val)
                 if new_val == old_val:
                     continue
-                else:
+                elif new_val and old_row:
+                    # update the existing grade value in the db
                     grade_id = old_row[0]
                     db.update_grade(self.db_connection, grade_id=grade_id,
                                     value=new_val)
-                    # update in place so changes appear in table view
+                    # modify in place so changes appear in table view
                     old_row[5] = new_val
+                elif new_val:
+                    # no existing grade value in db, so create one,
+                    # and add the row to the data used to generate the
+                    # editing table
+                    new_row_id = db.create_or_update_grade(self.db_connection,
+                                                           student_id=student_id,
+                                                           assignment_id=a[0],
+                                                           value=new_val)
+                    new_row = db.select_grades(self.db_connection,
+                                               grade_id=new_row_id)[0]
+                    row['grades'].append(new_row)
                 
             return row
  
