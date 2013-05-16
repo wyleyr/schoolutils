@@ -480,8 +480,8 @@ def delete_course_members(db_connection, member_id=None, course_id=None,
 
     return num_changes(db_connection)
     
-def select_grades(db_connection, student_id=None, course_id=None,
-                  assignment_id=None):
+def select_grades(db_connection, grade_id=None, student_id=None,
+                  course_id=None, assignment_id=None):
     """Get a result set of grades for a given student or course.
        The rows in the result set have the format:
        (grade_id, student_id, course_id, assignment_id, assignment_name,
@@ -497,8 +497,8 @@ def select_grades(db_connection, student_id=None, course_id=None,
     """
      
     constraints, params = make_conjunction_clause(
-        ['students.id', 'assignments.course_id', 'assignments.id'],
-        [student_id, course_id, assignment_id])
+        ['grades.id', 'students.id', 'assignments.course_id', 'assignments.id'],
+        [grade_id, student_id, course_id, assignment_id])
     query = add_where_clause(base_query, constraints)
    
     return db_connection.execute(query, params).fetchall()
