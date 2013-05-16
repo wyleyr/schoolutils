@@ -594,7 +594,9 @@ class SimpleUI(BaseUI):
                     db.update_grade(self.db_connection, grade_id=grade_id,
                                     value=new_val)
                     # modify in place so changes appear in table view
-                    old_row[5] = new_val
+                    idx = grades.index(old_row)
+                    grades[idx] = db.select_grades(self.db_connection,
+                                                   grade_id=grade_id)[0]
                 elif new_val:
                     # no existing grade value in db, so create one,
                     # and add the row to the data used to generate the
