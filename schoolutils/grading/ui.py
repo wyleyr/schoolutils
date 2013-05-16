@@ -540,7 +540,7 @@ class SimpleUI(BaseUI):
         row_fmt =  "{last_name: <15s}, {first_name: <15s}  {grades: <46s}"
         header = row_fmt.format(last_name="Last name", first_name="First name",
                                 # col headers are assignment names
-                                grades="".join("{0: <8s }".format(*a[2])
+                                grades="".join("{0: <8s }".format(*(a[2]))
                                                for a in assignments))
         def formatter(row):
             last_name, first_name = row['student'][1], row['student'][2]
