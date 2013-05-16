@@ -129,19 +129,29 @@
      but no database exists there yet
    - implement current_courses option
    - incremental search for course, assignment?
+   - fallback to create new assignment from selection menu seems to be
+     broken; also, the extra step here seems totally extraneous
    - calculate_all_grades interface to loop over all current courses
    
-** TODO [#A] Fix grade calculation when grades for a given student are missing
+** TODO [#A] Fix grade calculations				  :bug:ui:db:
    - problem 1: if grades are missing, we crash with a KeyError
    - problem 2: if user works around this by trying to use dictionary methods
      on GradeDict, data corruption happens *really easily*
      e.g. the following clobbered not just calculated grades, but ALL
      grades for the given course:
-     
     for k in assignments:
         if k not in student_grades: # broken
             student_grades[k] = 'F'
 
+   - problem 3: running grade calculation multiple times might lead to multiple
+     grade values for calculated grades(?) -- see GradeDict.save()
+   - problem 4: some calculated fields don't seem to update when calculations
+     are re-run.
+     The case I have observed here is if all the entered grades are
+     set to 'F', a calculated grade "Paper average" ends up as null
+     rather than 0.0, and re-running calculations doesn't fix it.
+     This seems to be an extreme edge case caused by SQLite's dynamic typing;
+     it doesn't happen if the calculated value is non-zero.
 ** TODO [#A] Testing framework					    :testing:
    - need to write tests for bugs, automate testing
    - use virtualenv to test empty configuration
