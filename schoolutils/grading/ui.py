@@ -576,7 +576,7 @@ class SimpleUI(BaseUI):
             prompt = "New grade value for %s (default: %s): "
             for a in assignments:
                 assignment_name = a[2]
-                old_row = grade_row_for_assignment('grades', a)
+                old_row = grade_row_for_assignment(grades, a)
                 if old_row:
                     old_val = old_row[5]
                 else:
