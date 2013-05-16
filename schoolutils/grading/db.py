@@ -564,7 +564,7 @@ def update_grade(db_connection, grade_id=None, value=None):
     
     query = """
     UPDATE grades
-    SET (value=?, timestamp=?)
+    SET value=?, timestamp=?
     WHERE id=?;
     """
     params = (value, datetime.datetime.now(), grade_id)
