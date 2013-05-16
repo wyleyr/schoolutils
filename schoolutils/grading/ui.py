@@ -554,7 +554,7 @@ class SimpleUI(BaseUI):
         def grade_val_for_assignment(grades, assignment):
             try:
                 val = grade_row_for_assignment(grades, assignment)[5]
-            except IndexError:
+            except TypeError: # if None is returned
                 val = None
             return val
                 
