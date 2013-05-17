@@ -155,18 +155,20 @@ class SimpleUI(BaseUI):
 
     def course_formatter(self, course_row):
         "Format COURSE_FORMAT with course from db"
-        return self.COURSE_FORMAT.format(year=course_row[3], semester=course_row[4],
-                                         number=course_row[2], name=course_row[1])
+        return self.COURSE_FORMAT.format(year=course_row['year'],
+                                         semester=course_row['semester'],
+                                         number=course_row['number'],
+                                         name=course_row['name'])
 
     def student_formatter(self, student_row):
         "Format STUDENT_FORMAT with student from db"
-        return self.STUDENT_FORMAT.format(last_name=student_row[1],
-                                          first_name=student_row[2],
-                                          sid=student_row[3])
+        return self.STUDENT_FORMAT.format(last_name=student_row['last_name'],
+                                          first_name=student_row['first_name'],
+                                          sid=student_row['sid'])
 
     def assignment_formatter(self, assignment_row):
-        return self.ASSIGNMENT_FORMAT.format(name=assignment_row[2],
-                                             due_date=assignment_row[3])
+        return self.ASSIGNMENT_FORMAT.format(name=assignment_row['name'],
+                                             due_date=assignment_row['due_date'])
 
     def grade_formatter(self, grade_row):
         pass
@@ -311,7 +313,7 @@ class SimpleUI(BaseUI):
             return self.get_student(create=create)
 
         print "Selected: %s" % self.student_formatter(student)
-        self.student_id = student[0]
+        self.student_id = student['id']
         return student
 
     # Top-level actions:       
@@ -375,7 +377,7 @@ class SimpleUI(BaseUI):
         if len(courses) == 1:
             course = courses[0]
             print "Found 1 course; selecting: %s" % self.course_formatter(course)
-            self.course_id = course[0]
+            self.course_id = course['id']
         elif len(courses) == 0:
             print "No courses found matching those criteria; please try again."
             return self.change_course()
@@ -385,7 +387,7 @@ class SimpleUI(BaseUI):
                 courses, self.course_formatter, allow_none=True)
             if course:
                 print "Selected: %s" % self.course_formatter(course)
-                self.course_id = course[0]
+                self.course_id = course['id']
 
                 
     @require('db_connection', change_database,
@@ -445,7 +447,7 @@ class SimpleUI(BaseUI):
                 assignments, self.assignment_formatter,
                 escape=self.create_assignment, allow_none=True)
             if assignment:
-                self.assignment_id = assignment[0]
+                self.assignment_id = assignment['id']
                 
             
     @require('db_connection', change_database,
@@ -484,7 +486,7 @@ class SimpleUI(BaseUI):
            Enter grades for the current assignment for individual students.
         """
         grade_type = db.select_assignments(self.db_connection,
-                                           assignment_id=self.assignment_id)[0][4]
+                                           assignment_id=self.assignment_id)[0]['grade_type']
         grade_validator = validators.validator_for_grade_type(grade_type)
         
         print ""
@@ -510,7 +512,7 @@ class SimpleUI(BaseUI):
                                 "Select a grade to update.",
                                 existing_grades,
                                 lambda g: "{4}: {5}".format(*g))
-                        grade_id = grade[0]
+                        grade_id = grade['id']
 
                 db.create_or_update_grade(self.db_connection,
                                           grade_id=grade_id,
@@ -540,26 +542,27 @@ class SimpleUI(BaseUI):
         row_fmt =  "{last_name: <15s} {first_name: <20s}  {grades: <60s}"
         header = row_fmt.format(last_name="Last name", first_name="First name",
                                 # col headers are assignment names
-                                grades="".join("{0: <10s} ".format(a[2])
+                                grades="".join("{0: <10s} ".format(a['name'])
                                                for a in assignments))
 
         def grade_row_for_assignment(grades, assignment):
             try:
                 # extract grade row which matches assignment id
-                row = filter(lambda g: g[3] == assignment[0], grades)[0]
+                row = filter(lambda g: g['assignment_id'] == assignment['id'],
+                             grades)[0]
             except IndexError:
                 row = None
             return row
 
         def grade_val_for_assignment(grades, assignment):
             try:
-                val = grade_row_for_assignment(grades, assignment)[5]
+                val = grade_row_for_assignment(grades, assignment)['value']
             except TypeError: # if None is returned
                 val = None
             return val
                 
         def formatter(row):
-            last_name, first_name = row['student'][1], row['student'][2]
+            last_name, first_name = row['student']['last_name'], row['student']['first_name']
             grades = row['grades']
             grade_vals = [grade_val_for_assignment(grades, a) 
                           for a in assignments]
@@ -575,14 +578,14 @@ class SimpleUI(BaseUI):
             
             prompt = "New grade value for %s (default: %s): "
             for a in assignments:
-                assignment_name = a[2]
+                assignment_name = a['name']
                 old_row = grade_row_for_assignment(grades, a)
                 if old_row:
-                    old_val = old_row[5]
+                    old_val = old_row['value']
                 else:
                     old_val = None
                     
-                grade_validator = validators.validator_for_grade_type(a[4])
+                grade_validator = validators.validator_for_grade_type(a['grade_type'])
 
                 new_val = typed_input(prompt % (assignment_name, old_val),
                                       grade_validator, default=old_val)
@@ -590,7 +593,7 @@ class SimpleUI(BaseUI):
                     continue
                 elif new_val and old_row:
                     # update the existing grade value in the db
-                    grade_id = old_row[0]
+                    grade_id = old_row['id']
                     db.update_grade(self.db_connection, grade_id=grade_id,
                                     value=new_val)
                     # modify in place so changes appear in table view
@@ -603,7 +606,7 @@ class SimpleUI(BaseUI):
                     # editing table
                     new_row_id = db.create_or_update_grade(self.db_connection,
                                                            student_id=student_id,
-                                                           assignment_id=a[0],
+                                                           assignment_id=a['id'],
                                                            value=new_val)
                     new_row = db.select_grades(self.db_connection,
                                                grade_id=new_row_id)[0]
@@ -617,7 +620,7 @@ class SimpleUI(BaseUI):
               'student': s,
               'grades': db.select_grades(self.db_connection,
                                          course_id=self.course_id,
-                                         student_id=s[0])
+                                         student_id=s['id'])
             })
     
         self.edit_table(rows, header, formatter, editor=editor)
@@ -723,7 +726,7 @@ class SimpleUI(BaseUI):
                 self.course_formatter,
                 allow_none=True)
             if course:
-                course_id = course[0]
+                course_id = course['id']
                 db.create_course_member(self.db_connection,
                                         student_id=self.student_id,
                                         course_id=course_id)
@@ -734,7 +737,7 @@ class SimpleUI(BaseUI):
             return course
                 
         def remove_from_course(course):
-            course_id = course[0]
+            course_id = course['id']
             db.delete_course_member(self.db_connection,
                                     student_id=self.student_id,
                                     course_id=course_id)
@@ -775,7 +778,7 @@ class SimpleUI(BaseUI):
         # last_name + first_name, sid, grade1, grade2, grade3...
         assignments = db.select_assignments(self.db_connection,
                                             course_id=self.course_id)
-        assignment_names = [a[2] for a in assignments]
+        assignment_names = [a['name'] for a in assignments]
         header = ["Name", "SID"] + assignment_names
         writer = csv.DictWriter(out_file, header)
         
@@ -800,8 +803,8 @@ class SimpleUI(BaseUI):
                 # times per course.  This is the simplest
                 # implementation for now but probably very slow; this
                 # loop is low-hanging fruit for optimization
-                assignment_id = a[0]
-                assignment_name = a[2]
+                assignment_id = a['id']
+                assignment_name = a['name']
                 grades = db.select_grades(self.db_connection,
                                           student_id=student_id,
                                           assignment_id=assignment_id)
@@ -813,14 +816,14 @@ class SimpleUI(BaseUI):
                     print ("Warning: multiple grades found for student %s "
                            "in assignment %s; using first in database" %
                            (row["Name"], assignment_name))
-                    row[assignment_name] = grades[0][5]
+                    row[assignment_name] = grades[0]['value']
                 elif len(grades) == 0:
                     print ("Warning: no grades found for student %s "
                            "in assignment %s; skipping" %
                            (row["Name"], assignment_name))
                     row[assignment_name] = None
                 else:
-                    row[assignment_name] = grades[0][5]
+                    row[assignment_name] = grades[0]['value']
                 
             try:
                 writer.writerow(row)
@@ -856,7 +859,7 @@ class SimpleUI(BaseUI):
         
         for s in students:
             grades = db.select_grades(self.db_connection,
-                                      student_id=s[0],
+                                      student_id=s['id'],
                                       course_id=self.course_id)
 
             if len(grades) != len(assignments):
