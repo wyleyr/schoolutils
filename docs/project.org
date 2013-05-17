@@ -18,7 +18,7 @@
    currently all lookups are just exact matches, but this is going to
    become cumbersome for text fields (esp. names)
 ** DONE [#A] Interface to see/add/edit students in current course   :ui:edit:
-** TODO [#A] Interface to see/edit grades in current assignment	    :ui:edit:
+** DONE [#A] Interface to see/edit grades in current assignment	    :ui:edit:
 ** TODO [#B] Interfaces to reporting functions		       :ui:reporting:
 ** TODO [#D] More sophisticated UI? Curses-based? 			 :ui:
 ** TODO [#C] Separation of 'view' and 'controller' UI code		 :ui:
@@ -152,6 +152,107 @@
      rather than 0.0, and re-running calculations doesn't fix it.
      This seems to be an extreme edge case caused by SQLite's dynamic typing;
      it doesn't happen if the calculated value is non-zero.
+*** Ideas for a better interface
+    1) Need to make API more robust.  Abstract over db operations, so
+       that we can have a functional data flow, but keep things
+       flexible enough to accommodate different grading schemes.
+    2) Remember that the primary concept here is
+       grades-for-assignments, not grades.  User will often want to
+       iterate over all the assignments for the course, not just
+       those for which the student has a grade.  On the other hand,
+       some grading schemes don't require students to turn in every
+       assignment.  
+    3) User may sometimes want to update entered grades, not just
+       create calculated grades.  (e.g., fill in 'F' for missing
+       grades)
+    4) It would be good to guarantee idempotence: re-running grade
+       calculations should never result in data loss/change for
+       entered grades.  But this is in tension with (3).
+    5) Should also plan for the possibility of multiple grades
+       recorded for a given student on an assignment.  Users may want
+       to select the most recent grade, or the highest, etc.
+    6) Users may want to compute grades on a per-class rather than
+       per-student basis, e.g., to compute final grades on a curve
+       based on average scores.  (This would be a big change.)
+
+Something like this?       
+#+BEGIN_SRC python
+  from schoolutils.grading import calc_helpers as ch
+  
+  def calculate_grade_146_fall2013(marshal):
+      # simple case: just need co-indexed lists of grade values, weights, etc.
+      vals, weights, types, assignment_names = marshal.unpack_entered_grades()
+  
+      # for more complicated cases: marshal provides methods for
+      # accessing different aspects of the raw data
+      # potential methods:
+      # all_assignments()
+      # assignments_with_grade()
+      # all_grades()
+      # grades_for_assignment()
+      # weight_for_grade()
+      # type_for_grade()
+      
+      # the actual calculations
+      avg = ch.letter_grade_average(vals, weights=weights)
+      final = ch.points_to_letter(avg)
+  
+      # simple case: just a name for the calculated field and a value 
+      # other fields in assignment and grades tables automatically populated
+      return {
+          'Paper average': avg,
+          'Final grade': final,
+      }
+  
+      # for more complicated needs: list of dictionaries specifying
+      # name, description, type, value
+      return [
+          dict(name='Paper average',
+               value=avg,
+               description='Weighted average of paper grades',
+               type=ch.FOUR_POINT),
+          dict(name='Final grade',
+               value=final,
+               description='Raw letter grade',
+               type=ch.LETTER)
+          ]
+   
+#+END_SRC       
+
+On the other hand, maybe these considerations are pointing toward a
+two-tiered API.  The two kinds of calculation function could be
+combined, so that e.g. one could run 
+#+BEGIN_SRC python
+  # simple case: per-student calculations based on
+  # grade values, weights, types, and assignment names.
+  # Return dictionary mapping names of calculated grades to values.
+  # Could also allow a list of dictionaries as described above.
+  def calculate_student_grade_12A_fall2012(values, weights, types, names):
+      # ...
+      return {
+          'Homework average': avg,
+          'Raw final score': final,
+      }
+  
+  # complex case: full access to database, convenience methods,
+  # procedural rather than functional API
+  def calculate_complex_grade_12A_fall2012(marshal):
+      # marshal provides db connection, as well as convenience methods for
+      # getting grades for individual students as well as the whole class,
+      # etc. etc.
+      class_exam_scores = marshal.all_grades_for('Final exam (raw score)')
+      boxes = ch.make_curve(class_exam_scores, min=40) # etc.
+      for s in marshal.students():
+          # ... assign each student a letter grade based on curve, etc.
+          score = marshal.grade_for_student(s, 'Final exam (raw score)')
+          grade = ch.score_to_curved_grade(score, boxes)
+          marshal.calculated_grade('Final exam (curved)', type=letter)
+  
+      # or simply do database manipulations yourself:
+      dbc = marshal.db_connection
+      grades = db.select_grades(dbc, course_id=marshal.course_id)
+      # etc.
+#+END_SRC
 ** TODO [#A] Testing framework					    :testing:
    - need to write tests for bugs, automate testing
    - use virtualenv to test empty configuration
