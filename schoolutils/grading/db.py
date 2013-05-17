@@ -43,6 +43,16 @@ class NoRecordsFound(GradeDBException):
 class MultipleRecordsFound(GradeDBException):
     pass
 
+def connect(path):
+    """Create a connection to a grade database at the given path.
+       Returns a sqlite3.Connection object appropriately initialized
+         for the grading application.
+    """
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+
+    return conn
+    
 def gradedb_init(db_connection):
     """Create a new SQLite database for storing grades.
        Creates a database with tables:

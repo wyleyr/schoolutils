@@ -21,7 +21,7 @@ User interfaces for grading utilities.
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 # 02110-1301, USA.
 
-import os, sys, sqlite3, csv
+import os, sys, csv
 
 from schoolutils.config import user_config, user_calculators
 from schoolutils.grading import db, validators
@@ -95,7 +95,7 @@ class BaseUI(object):
         "Set db_file and db_connection from user config and CLI options"
         self.db_file = self.get_config_option('gradedb_file', file_path)
         if self.db_file and os.path.exists(self.db_file):
-            self.db_connection = sqlite3.connect(self.db_file)
+            self.db_connection = db.connect(self.db_file)
         else:
             self.db_connection = None
 
@@ -199,13 +199,13 @@ class SimpleUI(BaseUI):
                 yn_bool)
             if create:
                 self.db_file = db_path
-                self.db_connection = sqlite3.connect(db_path)
+                self.db_connection = db.connect(db_path)
                 db.gradedb_init(self.db_connection)
             else:
                 return None
         else:
             self.db_file = db_path
-            self.db_connection = sqlite3.connect(db_path)
+            self.db_connection = db.connect(db_path)
 
             
     def get_student(self, create=False):
