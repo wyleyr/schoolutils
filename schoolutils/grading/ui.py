@@ -513,7 +513,8 @@ class SimpleUI(BaseUI):
                             grade = self.options_menu(
                                 "Select a grade to update.",
                                 existing_grades,
-                                lambda g: "{4}: {5}".format(*g))
+                                lambda g: "{0}: {1}".format(g['assignment_name'],
+                                                            g['value']))
                         grade_id = grade['id']
 
                 db.create_or_update_grade(self.db_connection,
