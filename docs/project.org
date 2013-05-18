@@ -287,6 +287,7 @@ combined, so that e.g. one could run
 	    # ...
 
 ** TODO [#C] Replace db.last_insert_rowid() with native sqlite3 call 	 :db:
+** TODO [#A] Completion message for grade calculation, export		 :ui:
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so
