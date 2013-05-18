@@ -517,6 +517,42 @@ def select_grades(db_connection, grade_id=None, student_id=None,
    
     return db_connection.execute(query, params).fetchall()
 
+def select_grades_for_course_members(db_connection, student_id=None, course_id=None):
+    """Select grades for members of a given course, for all assignments in that course.
+       The purpose of this function is to return a result set which contains all the
+       information necessary for calculating grades in simple cases.
+
+       This function does two things differently than select_grades:
+       1) The result set contains, for every course member, a row for every
+          assignment in the course, regardless of whether the student has a grade
+          for that assignment or not.  (If a student does not have a grade for a
+          given assignment, the grades.value field is simply NULL.)
+       2) The result set contains additional fields necessary for calculating grades,
+          namely, assignments.weight, assignments.grade_type.
+
+       The result set has the following columns:
+       assignment_id, assignment_name, weight, grade_type, grade_id, student_id, value
+    """
+    base_query = """
+    SELECT assignments.id AS assignment_id,
+           assignments.name AS assignment_name,
+           assignments.weight,
+           assignments.grade_type,
+           grades.id AS grade_id,
+           grades.student_id,
+           grades.value
+    FROM (course_memberships, assignments USING (course_id))
+         LEFT OUTER JOIN grades ON (course_memberships.student_id=grades.student_id AND assignments.id=grades.assignment_id)
+    %(where)s;
+    """
+
+    constraints, params = make_conjunction_clause(
+        ['course_memberships.course_id', 'course_memberships.student_id'],
+        [course_id, student_id])
+    query = add_where_clause(base_query, constraints)
+
+    return db_connection.execute(query, params).fetchall()
+
 def create_grade(db_connection, assignment_id=None, student_id=None, value=None,
                  timestamp=None):
     """Create a new grade in the database.
