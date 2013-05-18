@@ -502,6 +502,8 @@ class SimpleUI(BaseUI):
                                                    assignment_id=self.assignment_id)
                 if existing_grades:
                     print "Student has existing grades for this assignment."
+                    print "Existing grades are: %s" % ",".join(
+                        str(g['value']) for g in existing_grades)
                     update = typed_input("Update/overwrite? (Y/N) ", yn_bool)
                     if update:
                         if len(existing_grades) == 1:
