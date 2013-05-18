@@ -793,40 +793,25 @@ class SimpleUI(BaseUI):
         except AttributeError:
             writer.writerow(dict(zip(header,header)))
 
+        all_grades = db.select_grades_for_course_members(
+            self.db_connection,
+            course_id=self.course_id)
+        
         for s in students:
             row = {}
-            student_id, last_name, first_name, sid, email = s
-           
-            row["Name"] = "%s, %s" % (last_name, first_name)
-            row["SID"] = sid
-            for a in assignments:
-                # TODO: we're hitting the db (# of assignments * # of
-                # students) times here -- possibly on the order of 200
-                # times per course.  This is the simplest
-                # implementation for now but probably very slow; this
-                # loop is low-hanging fruit for optimization
-                assignment_id = a['id']
-                assignment_name = a['name']
-                grades = db.select_grades(self.db_connection,
-                                          student_id=student_id,
-                                          assignment_id=assignment_id)
-                if len(grades) > 1:
-                    # TODO: we should use the most recently saved
-                    # grade value here (presently select_grades does
-                    # not return timestamps, but UI also disallows
-                    # multiple grades to be entered)
-                    print ("Warning: multiple grades found for student %s "
-                           "in assignment %s; using first in database" %
-                           (row["Name"], assignment_name))
-                    row[assignment_name] = grades[0]['value']
-                elif len(grades) == 0:
-                    print ("Warning: no grades found for student %s "
-                           "in assignment %s; skipping" %
-                           (row["Name"], assignment_name))
-                    row[assignment_name] = None
+            row["Name"] = "%s, %s" % (s['last_name'], s['first_name'])
+            row["SID"] = s['sid']
+            grades = filter(lambda row: row['student_id'] == s['id'], all_grades)
+            for g in grades:
+                assignment_name = g['assignment_name']
+                if assignment_name not in row:
+                    row[assignment_name] = g['value']
                 else:
-                    row[assignment_name] = grades[0]['value']
-                
+                    print ("Warning: multiple grades found for student %s "
+                           "for assignment %s; only exporting first result."
+                           % (self.student_formatter(s), assignment_name))
+                    continue
+            
             try:
                 writer.writerow(row)
             except IOError:
