@@ -567,7 +567,7 @@ def create_grade(db_connection, assignment_id=None, student_id=None, value=None,
     """
     fields, places, params = make_values_clause(
         ['assignment_id', 'student_id', 'value', 'timestamp'],
-        [course_id, student_id, value, timestamp])
+        [assignment_id, student_id, value, timestamp])
     query = base_query % {'fields': fields, 'places': places}
     db_connection.execute(query, params)
 
