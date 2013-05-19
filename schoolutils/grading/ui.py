@@ -867,7 +867,7 @@ class SimpleUI(BaseUI):
                         weight=weight)
                 # MultipleRecordsFound should propagate
                 
-            row_id = create_or_update_grade(
+            row_id = db.create_or_update_grade(
                 db_connection,
                 student_id=student_id,
                 assignment_id=assignment_id,
