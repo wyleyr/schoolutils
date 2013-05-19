@@ -179,22 +179,12 @@ Something like this?
 #+BEGIN_SRC python
   from schoolutils.grading import calc_helpers as ch
   
-  def calculate_grade_146_fall2013(marshal):
+  def calculate_grade_146_fall2013(rows):
       # simple case: just need co-indexed lists of grade values, weights, etc.
-      vals, weights, types, assignment_names = marshal.unpack_entered_grades()
+      vals, weights, types, assignment_names = ch.unpack_entered_grades(rows)
   
-      # for more complicated cases: marshal provides methods for
-      # accessing different aspects of the raw data
-      # potential methods:
-      # all_assignments()
-      # assignments_with_grade()
-      # all_grades()
-      # grades_for_assignment()
-      # weight_for_grade()
-      # type_for_grade()
-      
       # the actual calculations
-      avg = ch.letter_grade_average(vals, weights=weights)
+      avg = ch.letter_grade_average(vals, weights=weights, missing='F')
       final = ch.points_to_letter(avg)
   
       # simple case: just a name for the calculated field and a value 
@@ -206,16 +196,25 @@ Something like this?
   
       # for more complicated needs: list of dictionaries specifying
       # name, description, type, value
+      # optional: include grade_id as a key to update an existing grade,
+      # or assignment_id to create a new grade for an existing assignment
       return [
           dict(name='Paper average',
                value=avg,
                description='Weighted average of paper grades',
-               type=ch.FOUR_POINT),
+               grade_type=ch.FOUR_POINT),
           dict(name='Final grade',
                value=final,
                description='Raw letter grade',
-               type=ch.LETTER)
+               grade_type=ch.LETTER),
+          # update existing grade
+          dict(grade_id=some_grade_id,
+               value=new_value)
+          # create grade for assignment
+          dict(assignment_id=some_assignment_id,
+               value='F')
           ]
+  
    
 #+END_SRC       
 
