@@ -19,6 +19,8 @@ calculator_helpers.py: helpers for user-defined calculation functions.
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 # 02110-1301, USA.
 
+import math
+
 # Useful constants:
 POINTS = [
     # format: (letter grade, point_value, exclusive_max, inclusive_min)
