@@ -868,7 +868,7 @@ class SimpleUI(BaseUI):
                 # MultipleRecordsFound should propagate
                 
             row_id = db.create_or_update_grade(
-                db_connection,
+                self.db_connection,
                 student_id=student_id,
                 assignment_id=assignment_id,
                 value=value)
