@@ -841,7 +841,7 @@ class SimpleUI(BaseUI):
                                   weight='CALC'):
             if not name and not assignment_id:
                 raise ValueError("No assignment name given for calculated grade.")
-            if not value:
+            if value is None: # missing values not allowed, but 0/False/etc. OK
                 raise ValueError("No value given for calculated grade %s." % name)
 
             if grade_id:
