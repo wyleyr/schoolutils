@@ -914,9 +914,7 @@ class SimpleUI(BaseUI):
             for cg in calculated_grades:
                 save_calculated_grade(s['id'], **cg)
 
-            print ("Successfully calculated grades for %s." %
-                   self.student_formatter(s))
-
+        print "Grade calculations ran successfully.\n"
             
 
     def exit(self):
