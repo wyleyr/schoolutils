@@ -145,3 +145,31 @@ def points_to_weights(point_values):
     s = sum(point_values)
     return [float(p)/s for p in point_values]
 
+# Munging input data:
+def unpack_entered_grades(rows):
+    """Extract grade values, weights, types and assignment names from a sequence
+       of grade rows produced by, e.g., select_grades_for_course_members.
+       Each row must have fields: value, weight, grade_type, assignment_name
+       Skips any row where the weight is 'CALC' (indicating a calculated grade).
+       
+       Returns four co-indexed lists, in the following order:
+         values: grade values
+         weights: assignment weights
+         types: assignment grade types
+         names: assignment names
+    """
+    values = []
+    weights = []
+    types = []
+    assignment_names = []
+    for r in rows:
+        # filter out rows which are for calculated grades
+        if r['weight'] == 'CALC':
+            continue
+
+        values.append(r['value'])
+        weights.append(r['weight'])
+        types.append(r['grade_type'])
+        assignment_names.append(r['assignment_name'])
+
+    return values, weights, types, assignment_names
