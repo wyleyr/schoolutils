@@ -901,7 +901,7 @@ class SimpleUI(BaseUI):
             try:
                 calculated_grades = calc_func(grades)
             except Exception as e:
-                print ("Failed to calculate grades for %s."
+                print ("Failed to calculate grades for %s. "
                        "Error was: %s.  Skipping..." %
                        (self.student_formatter(s), e))
                 continue
