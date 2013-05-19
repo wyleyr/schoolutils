@@ -828,10 +828,60 @@ class SimpleUI(BaseUI):
            Run the (user-defined) grade calculation function for students in the
            current course.
         """
-        _, name, num, yr, sem = db.select_courses(self.db_connection,
-                                                  course_id=self.course_id)[0]
-        safe_num = num.replace('-', '_').replace('.', '_')
-        calc_name = 'calculate_grade_' + safe_num + '_' + sem.lower() + str(yr)
+        def save_calculated_grade(student_id,
+                                  name='', # required, unless grade_id is given
+                                  value='', # required
+                                  # to update an existing grade:
+                                  grade_id=None,
+                                  # to add a grade for an existing assignment:
+                                  assignment_id=None, 
+                                  # to create a new assignment:
+                                  description='(Assignment for calculated grade)',
+                                  grade_type=None,
+                                  weight='CALC'):
+            if not name and not assignment_id:
+                raise ValueError("No assignment name given for calculated grade.")
+            if not value:
+                raise ValueError("No value given for calculated grade %s." % name)
+
+            if grade_id:
+                db.update_grade(self.db_connection,
+                                student_id=student_id,
+                                grade_id=grade_id,
+                                value=value)
+                return grade_id
+
+            if not assignment_id:
+                try:
+                    assignment_id = db.ensure_unique(db.select_assignments(
+                        self.db_connection,
+                        course_id=self.course_id,
+                        name=name))
+                except db.NoRecordsFound:
+                    assignment_id = db.create_assignment(
+                        self.db_connection,
+                        course_id=self.course_id,
+                        name=name,
+                        description=description,
+                        grade_type=grade_type,
+                        weight=weight)
+                # MultipleRecordsFound should propagate
+                
+            row_id = create_or_update_grade(
+                db_connection,
+                student_id=student_id,
+                assignment_id=assignment_id,
+                value=value)
+
+            return row_id
+ 
+        
+                                  
+        course = db.select_courses(self.db_connection,
+                                   course_id=self.course_id)[0]
+        safe_num = course['number'].replace('-', '_').replace('.', '_')
+        calc_name = ('calculate_grade_' + safe_num + '_' +
+                     course['semester'].lower() + str(course['year']))
         calc_func = getattr(user_calculators, calc_name, None)
 
         if not calc_func:
@@ -842,22 +892,31 @@ class SimpleUI(BaseUI):
 
         students = db.select_students(self.db_connection,
                                       course_id=self.course_id)
-        assignments = db.select_assignments(self.db_connection,
-                                            course_id=self.course_id)
-        
         for s in students:
-            grades = db.select_grades(self.db_connection,
-                                      student_id=s['id'],
-                                      course_id=self.course_id)
+            grades = db.select_grades_for_course_members(
+                self.db_connection,
+                student_id=s['id'],
+                course_id=self.course_id)
 
-            if len(grades) != len(assignments):
-                # TODO: something more sophisticated here
-                # skip? pass to grade function anyway? user-configurable behavior?
-                print ("Warning: %s does not have a grade for all assignments "
-                       "in this course." % self.student_formatter(s))
-                
-            grade_dict = calc_func(db.GradeDict(grades))
-            grade_dict.save(self.db_connection)
+            try:
+                calculated_grades = calc_func(grades)
+            except Exception as e:
+                print ("Failed to calculate grades for %s."
+                       "Error was: %s.  Skipping..." %
+                       (self.student_formatter(s), e))
+                continue
+            if type(calculated_grades) is dict:
+                # transpose to the list format to use save_calculated_grades
+                calculated_grades = [
+                    {'name': k, 'value': v}
+                    for k, v in calculated_grades.items()]
+
+            for cg in calculated_grades:
+                save_calculated_grade(s['id'], **cg)
+
+            print ("Successfully calculated grades for %s." %
+                   self.student_formatter(s))
+
             
 
     def exit(self):
