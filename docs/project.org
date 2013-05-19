@@ -287,6 +287,20 @@ combined, so that e.g. one could run
 
 ** TODO [#C] Replace db.last_insert_rowid() with native sqlite3 call 	 :db:
 ** TODO [#A] Completion message for grade calculation, export		 :ui:
+** TODO [#B] Use itertools.groupby() to save database hits?  :ui:performance:
+   instead of hitting database with a new query for each student, we
+   can do e.g.
+#+BEGIN_SRC python
+  import itertools
+  
+  # get all the grade rows for the whole class
+  all_grades = db.select_grades_for_course_members(db_connection, course_id=course_id)
+  
+  # then loop over them by student
+  for student_id, rows in itertools.groupby(all_grades, lambda r: r['student_id']):
+      # here, rows will be just grades for one student...
+      
+#+END_SRC
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so
