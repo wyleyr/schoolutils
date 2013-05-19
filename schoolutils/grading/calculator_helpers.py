@@ -101,20 +101,6 @@ def number_to_letter(n, scale):
         raise ValueError("Value %s not on scale with max=%s and min=%s" %
                          (n, scale[0][2], scale[-2][3])) 
      
-def extract_and_zero_grades(fields, d):
-    "Extract an array of grades from a dictionary; convert non-numeric values to 0.0"
-    # convert strings to floats; non-numeric values get a zero
-    grades = []
-    for f in fields:
-        try:
-            g = float(d[f])
-        except ValueError:
-            #print "converting to zero: %s" % d[f]
-            g = 0.0
-        grades.append(g)
-
-    return grades
-
 # Aggregations and averages:   
 def letter_grade_average(letter_grades, weights=None):
     """4.0-scale average of grades in letter_grades.
@@ -173,3 +159,18 @@ def unpack_entered_grades(rows):
         assignment_names.append(r['assignment_name'])
 
     return values, weights, types, assignment_names
+
+def extract_and_zero_grades(fields, d):
+    "Extract an array of grades from a dictionary; convert non-numeric values to 0.0"
+    # convert strings to floats; non-numeric values get a zero
+    grades = []
+    for f in fields:
+        try:
+            g = float(d[f])
+        except ValueError:
+            #print "converting to zero: %s" % d[f]
+            g = 0.0
+        grades.append(g)
+
+    return grades
+
