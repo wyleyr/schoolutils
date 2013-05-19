@@ -61,7 +61,7 @@
    No idea if it works, or how, on Windows or other Unixes.  May need
    to revisit in the future.
 ** DONE [#A] Write docs for initial release!				:doc:
-** TODO [#D] Make compatible with Python 3			  :packaging:
+** TODO [#C] Make compatible with Python 3			  :packaging:
    - actually we are not far off, here
    - 2to3 reveals that pretty much the only changes that need to be made
      are for print statements (<2013-01-19 Sat>)
@@ -91,7 +91,7 @@
      + -g : calculate grades
      + -i : import students
      + -x : export grades
-** TODO [#B] Interface for exporting (sorted) lists of grades	  :ui:export:
+** DONE [#B] Interface for exporting (sorted) lists of grades	  :ui:export:
 ** TODO [#A] Test and fix nested KeyboardInterrupt loop breakout	 :ui:
 ** TODO [#B] Figure out institution setup				 :ui:
    - need an API definition for institution modules
@@ -133,7 +133,7 @@
      broken; also, the extra step here seems totally extraneous
    - calculate_all_grades interface to loop over all current courses
    
-** TODO [#A] Fix grade calculations				  :bug:ui:db:
+** INPROGRESS [#A] Fix grade calculations			  :bug:ui:db:
    - problem 1: if grades are missing, we crash with a KeyError
    - problem 2: if user works around this by trying to use dictionary methods
      on GradeDict, data corruption happens *really easily*
