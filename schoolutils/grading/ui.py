@@ -767,7 +767,7 @@ class SimpleUI(BaseUI):
         """Export grades.
            Export grades for the current course to a CSV file.
         """
-        out_file_name = typed_input("Enter a path for grade export: ", file_path)
+        out_file_name = typed_input("Enter a path to CSV file to export grades: ", file_path)
         if os.path.exists(out_file_name):
             print "Warning: file %s exists." % out_file_name
             overwrite = typed_input("Overwrite? (Y/N) ", yn_bool)
