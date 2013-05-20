@@ -803,6 +803,7 @@ class SimpleUI(BaseUI):
                 continue
 
         out_file.close()
+        print "Grades exported successfully to: %s.\n" % out_file_name
                 
     @require('course_id', change_course,
              "A selected course is required to calculate grades.")
