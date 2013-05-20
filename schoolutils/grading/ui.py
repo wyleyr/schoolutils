@@ -538,7 +538,7 @@ class SimpleUI(BaseUI):
            Edit a table of grades for the current course.
         """
         # TODO: handle case where student has multiple grades for an
-        # assignment Presently these are silently dropped in the
+        # assignment. Presently these are silently dropped in the
         # display, but when editing, user is asked to enter new grades
         # multiple times.
         def formatter(tbl_row):
@@ -554,6 +554,11 @@ class SimpleUI(BaseUI):
             for g in tbl_row['grades']:
                 grade_validator = validators.validator_for_grade_type(g['grade_type'])
                 old_val = g['value']
+                # TODO: user can get stuck in a loop here if there is no existing
+                # grade value but user doesn't want to enter one, because typed_input
+                # will requery when default is None.  WONTFIX for now, because this
+                # is an edge case, because it is easily (and correctly) escaped via
+                # Control-C, and because generally, user should just enter the grade.
                 new_val = typed_input(prompt % (g['assignment_name'], old_val),
                                       grade_validator, default=old_val)
                 if new_val == old_val:
