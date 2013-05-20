@@ -21,7 +21,7 @@ User interfaces for grading utilities.
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 # 02110-1301, USA.
 
-import os, sys, csv
+import os, sys, csv, datetime
 
 from schoolutils.config import user_config, user_calculators
 from schoolutils.grading import db, validators
@@ -590,6 +590,8 @@ class SimpleUI(BaseUI):
                                all_grades)}
             for s in students]
 
+        # we use select_assignments here because it orders the
+        # assignments by due date
         assignments = db.select_assignments(self.db_connection,
                                             course_id=self.course_id)
         assignment_names = [a['name'] for a in assignments]
@@ -753,6 +755,8 @@ class SimpleUI(BaseUI):
         
         # format, for now:
         # last_name + first_name, sid, grade1, grade2, grade3...
+        # we use select_assignments here because it orders the
+        # assignments by due date
         assignments = db.select_assignments(self.db_connection,
                                             course_id=self.course_id)
         assignment_names = [a['name'] for a in assignments]
@@ -811,9 +815,10 @@ class SimpleUI(BaseUI):
                                   assignment_id=None, 
                                   # to create a new assignment:
                                   description='(Assignment for calculated grade)',
+                                  due_date=datetime.date.today(),
                                   grade_type=None,
                                   weight='CALC'):
-            if not name and not assignment_id:
+            if not name and not (assignment_id or grade_id):
                 raise ValueError("No assignment name given for calculated grade.")
             if value is None: # missing values not allowed, but 0/False/etc. OK
                 raise ValueError("No value given for calculated grade %s." % name)
@@ -838,6 +843,7 @@ class SimpleUI(BaseUI):
                         name=name,
                         description=description,
                         grade_type=grade_type,
+                        due_date=due_date,
                         weight=weight)
                 # MultipleRecordsFound should propagate
                 
