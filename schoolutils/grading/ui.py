@@ -21,7 +21,7 @@ User interfaces for grading utilities.
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 # 02110-1301, USA.
 
-import os, sys, sqlite3
+import os, sys, csv, datetime
 
 from schoolutils.config import user_config, user_calculators
 from schoolutils.grading import db, validators
@@ -95,7 +95,7 @@ class BaseUI(object):
         "Set db_file and db_connection from user config and CLI options"
         self.db_file = self.get_config_option('gradedb_file', file_path)
         if self.db_file and os.path.exists(self.db_file):
-            self.db_connection = sqlite3.connect(self.db_file)
+            self.db_connection = db.connect(self.db_file)
         else:
             self.db_connection = None
 
@@ -155,18 +155,20 @@ class SimpleUI(BaseUI):
 
     def course_formatter(self, course_row):
         "Format COURSE_FORMAT with course from db"
-        return self.COURSE_FORMAT.format(year=course_row[3], semester=course_row[4],
-                                         number=course_row[2], name=course_row[1])
+        return self.COURSE_FORMAT.format(year=course_row['year'],
+                                         semester=course_row['semester'],
+                                         number=course_row['number'],
+                                         name=course_row['name'])
 
     def student_formatter(self, student_row):
         "Format STUDENT_FORMAT with student from db"
-        return self.STUDENT_FORMAT.format(last_name=student_row[1],
-                                          first_name=student_row[2],
-                                          sid=student_row[3])
+        return self.STUDENT_FORMAT.format(last_name=student_row['last_name'],
+                                          first_name=student_row['first_name'],
+                                          sid=student_row['sid'])
 
     def assignment_formatter(self, assignment_row):
-        return self.ASSIGNMENT_FORMAT.format(name=assignment_row[2],
-                                             due_date=assignment_row[3])
+        return self.ASSIGNMENT_FORMAT.format(name=assignment_row['name'],
+                                             due_date=assignment_row['due_date'])
 
     def grade_formatter(self, grade_row):
         pass
@@ -199,13 +201,13 @@ class SimpleUI(BaseUI):
                 yn_bool)
             if create:
                 self.db_file = db_path
-                self.db_connection = sqlite3.connect(db_path)
+                self.db_connection = db.connect(db_path)
                 db.gradedb_init(self.db_connection)
             else:
                 return None
         else:
             self.db_file = db_path
-            self.db_connection = sqlite3.connect(db_path)
+            self.db_connection = db.connect(db_path)
 
             
     def get_student(self, create=False):
@@ -311,7 +313,7 @@ class SimpleUI(BaseUI):
             return self.get_student(create=create)
 
         print "Selected: %s" % self.student_formatter(student)
-        self.student_id = student[0]
+        self.student_id = student['id']
         return student
 
     # Top-level actions:       
@@ -330,9 +332,10 @@ class SimpleUI(BaseUI):
                  self.import_students,
                  self.edit_student,
                  self.enter_grades,
+                 self.edit_grades,
                  self.calculate_grades,
                  #self.import_grades,
-                 #self.export_grades,
+                 self.export_grades,
                  self.exit])
 
             # commit after successful completion of any top-level action
@@ -374,7 +377,7 @@ class SimpleUI(BaseUI):
         if len(courses) == 1:
             course = courses[0]
             print "Found 1 course; selecting: %s" % self.course_formatter(course)
-            self.course_id = course[0]
+            self.course_id = course['id']
         elif len(courses) == 0:
             print "No courses found matching those criteria; please try again."
             return self.change_course()
@@ -384,7 +387,7 @@ class SimpleUI(BaseUI):
                 courses, self.course_formatter, allow_none=True)
             if course:
                 print "Selected: %s" % self.course_formatter(course)
-                self.course_id = course[0]
+                self.course_id = course['id']
 
                 
     @require('db_connection', change_database,
@@ -444,7 +447,7 @@ class SimpleUI(BaseUI):
                 assignments, self.assignment_formatter,
                 escape=self.create_assignment, allow_none=True)
             if assignment:
-                self.assignment_id = assignment[0]
+                self.assignment_id = assignment['id']
                 
             
     @require('db_connection', change_database,
@@ -459,8 +462,11 @@ class SimpleUI(BaseUI):
         description = typed_input("Enter description: ", str, default='')
         due_date = typed_input("Enter due date (YYYY-MM-DD): ", validators.date)
         grade_type = typed_input("Enter grade type: ", validators.grade_type)
-        weight = typed_input("Enter weight (as decimal): ",
-                             validators.grade_weight)
+        if grade_type == "points":
+            weight_prompt = "Enter number of possible points: "
+        else:
+            weight_prompt = "Enter grade weight (as decimal fraction of 1): "
+        weight = typed_input(weight_prompt, validators.grade_weight)
 
         self.assignment_id = db.create_assignment(
             self.db_connection,
@@ -479,21 +485,25 @@ class SimpleUI(BaseUI):
         """Enter grades.
            Enter grades for the current assignment for individual students.
         """
-        # TODO: select grade validator based on assignment type
-        # _, __, = select_assignments(self.db_connection, assignment_id=self.assignment_id)
+        grade_type = db.select_assignments(self.db_connection,
+                                           assignment_id=self.assignment_id)[0]['grade_type']
+        grade_validator = validators.validator_for_grade_type(grade_type)
+        
         print ""
         print "Use Control-C to finish entering grades."
         while True:
             try:
                 student_id, last_name, first_name, sid, _ = self.get_student()
                 grade_id = None
-                grade_val = typed_input("Enter grade value: ", str)
+                grade_val = typed_input("Enter grade value: ", grade_validator)
                 existing_grades = db.select_grades(self.db_connection,
                                                    student_id=student_id,
                                                    course_id=self.course_id,
                                                    assignment_id=self.assignment_id)
                 if existing_grades:
                     print "Student has existing grades for this assignment."
+                    print "Existing grades are: %s" % ",".join(
+                        str(g['value']) for g in existing_grades)
                     update = typed_input("Update/overwrite? (Y/N) ", yn_bool)
                     if update:
                         if len(existing_grades) == 1:
@@ -503,8 +513,9 @@ class SimpleUI(BaseUI):
                             grade = self.options_menu(
                                 "Select a grade to update.",
                                 existing_grades,
-                                lambda g: "{4}: {5}".format(*g))
-                        grade_id = grade[0]
+                                lambda g: "{0}: {1}".format(g['assignment_name'],
+                                                            g['value']))
+                        grade_id = grade['id']
 
                 db.create_or_update_grade(self.db_connection,
                                           grade_id=grade_id,
@@ -517,6 +528,87 @@ class SimpleUI(BaseUI):
                 break
             # TODO: shortcut here for changing to another assignment?
             # enter_grades_for_student method? (for a single student across all course assignments)
+
+    @require('db_connection', change_database,
+             "A database connection is required to edit grades.")
+    @require('course_id', change_course,
+             "A selected course is required to edit grades.")
+    def edit_grades(self):
+        """Edit grades.
+           Edit a table of grades for the current course.
+        """
+        # TODO: handle case where student has multiple grades for an
+        # assignment. Presently these are silently dropped in the
+        # display, but when editing, user is asked to enter new grades
+        # multiple times.
+        def formatter(tbl_row):
+            return row_fmt.format(name=self.student_formatter(tbl_row['student']),
+                                  **dict((g['assignment_name'], str(g['value']))
+                                         for g in tbl_row['grades']))
+
+        def editor(tbl_row):
+            print "Editing grades for %s." % self.student_formatter(tbl_row['student'])
+            
+            prompt = "New grade value for %s (default: %s): "
+            any_updates = False
+            for g in tbl_row['grades']:
+                grade_validator = validators.validator_for_grade_type(g['grade_type'])
+                old_val = g['value']
+                # TODO: user can get stuck in a loop here if there is no existing
+                # grade value but user doesn't want to enter one, because typed_input
+                # will requery when default is None.  WONTFIX for now, because this
+                # is an edge case, because it is easily (and correctly) escaped via
+                # Control-C, and because generally, user should just enter the grade.
+                new_val = typed_input(prompt % (g['assignment_name'], old_val),
+                                      grade_validator, default=old_val)
+                if new_val == old_val:
+                    continue
+                elif new_val:
+                    any_updates = True
+                    new_grade_id = db.create_or_update_grade(
+                        self.db_connection,
+                        student_id=g['student_id'],
+                        assignment_id=g['assignment_id'],
+                        grade_id=g['grade_id'], # may be None if grade didn't exist
+                        value=new_val)
+
+            if any_updates:
+                return {
+                    'student': tbl_row['student'],
+                    'grades': db.select_grades_for_course_members(
+                        self.db_connection,
+                        course_id=self.course_id,
+                        student_id=tbl_row['student']['id'])
+                    }
+            else:
+                return tbl_row
+
+            
+        students = db.select_students(self.db_connection,
+                                      course_id=self.course_id)
+        all_grades = db.select_grades_for_course_members(
+            self.db_connection,
+            course_id=self.course_id)
+        rows = [
+            {'student': s,
+             'grades': filter(lambda r: r['student_id'] == s['id'],
+                               all_grades)}
+            for s in students]
+
+        # we use select_assignments here because it orders the
+        # assignments by due date
+        assignments = db.select_assignments(self.db_connection,
+                                            course_id=self.course_id)
+        assignment_names = [a['name'] for a in assignments]
+        row_fmt = "{name: <40s}  "
+        for a in assignment_names:
+            row_fmt += "{" + a + ": <10s}"
+        
+        header = row_fmt.format(name="Student",
+                                **dict((a,a) for a in assignment_names))
+    
+        self.edit_table(rows, header, formatter, editor=editor)
+        print "Grades updated successfully."
 
     @require('db_connection', change_database,
              "A database connection is required to import students.")
@@ -547,8 +639,6 @@ class SimpleUI(BaseUI):
                                    deleter=lambda s: None)
 
         for s in students:
-            if 'full_name' in s:
-                s.pop('full_name') # name should now be properly split 
             try:
                 s['student_id'] = db.get_student_id(self.db_connection,
                                                     sid=s['sid'],
@@ -558,7 +648,11 @@ class SimpleUI(BaseUI):
                 s['student_id'] = None
 
             student_id = db.create_or_update_student(
-                self.db_connection, **s)
+                self.db_connection,
+                sid=s['sid'],
+                first_name=s['first_name'],
+                last_name=s['last_name'],
+                email=s['email'])
             course_member_id = db.create_course_member(
                 self.db_connection,
                 student_id=student_id,
@@ -616,7 +710,7 @@ class SimpleUI(BaseUI):
                 self.course_formatter,
                 allow_none=True)
             if course:
-                course_id = course[0]
+                course_id = course['id']
                 db.create_course_member(self.db_connection,
                                         student_id=self.student_id,
                                         course_id=course_id)
@@ -627,7 +721,7 @@ class SimpleUI(BaseUI):
             return course
                 
         def remove_from_course(course):
-            course_id = course[0]
+            course_id = course['id']
             db.delete_course_member(self.db_connection,
                                     student_id=self.student_id,
                                     course_id=course_id)
@@ -648,9 +742,69 @@ class SimpleUI(BaseUI):
     def import_grades(self):
         pass
 
+    @require('course_id', change_course,
+             "A selected course is required to export grades.")
     def export_grades(self):
-        pass
+        """Export grades.
+           Export grades for the current course to a CSV file.
+        """
+        out_file_name = typed_input("Enter a path to CSV file to export grades: ", file_path)
+        if os.path.exists(out_file_name):
+            print "Warning: file %s exists." % out_file_name
+            overwrite = typed_input("Overwrite? (Y/N) ", yn_bool)
+            if not overwrite:
+                print "Abort."
+                return
 
+        out_file = open(out_file_name, 'w')
+        
+        # format, for now:
+        # last_name + first_name, sid, grade1, grade2, grade3...
+        # we use select_assignments here because it orders the
+        # assignments by due date
+        assignments = db.select_assignments(self.db_connection,
+                                            course_id=self.course_id)
+        assignment_names = [a['name'] for a in assignments]
+        header = ["Name", "SID"] + assignment_names
+        writer = csv.DictWriter(out_file, header)
+        
+        students = db.select_students(self.db_connection,
+                                      course_id=self.course_id)
+
+        # writeheader() became available in Python 2.7:
+        try:
+            writer.writeheader()
+        except AttributeError:
+            writer.writerow(dict(zip(header,header)))
+
+        all_grades = db.select_grades_for_course_members(
+            self.db_connection,
+            course_id=self.course_id)
+        
+        for s in students:
+            row = {}
+            row["Name"] = "%s, %s" % (s['last_name'], s['first_name'])
+            row["SID"] = s['sid']
+            grades = filter(lambda row: row['student_id'] == s['id'], all_grades)
+            for g in grades:
+                assignment_name = g['assignment_name']
+                if assignment_name not in row:
+                    row[assignment_name] = g['value']
+                else:
+                    print ("Warning: multiple grades found for student %s "
+                           "for assignment %s; only exporting first result."
+                           % (self.student_formatter(s), assignment_name))
+                    continue
+            
+            try:
+                writer.writerow(row)
+            except IOError:
+                print ("Warning: could not write row to CSV: %r." % row)
+                continue
+
+        out_file.close()
+        print "Grades exported successfully to: %s.\n" % out_file_name
+                
     @require('course_id', change_course,
              "A selected course is required to calculate grades.")
     def calculate_grades(self):
@@ -658,10 +812,72 @@ class SimpleUI(BaseUI):
            Run the (user-defined) grade calculation function for students in the
            current course.
         """
-        _, name, num, yr, sem = db.select_courses(self.db_connection,
-                                                  course_id=self.course_id)[0]
-        safe_num = num.replace('-', '_').replace('.', '_')
-        calc_name = 'calculate_grade_' + safe_num + '_' + sem.lower() + str(yr)
+        def save_calculated_grade(student_id,
+                                  name='', # required, unless grade_id or assignment_id given
+                                  value='', # required
+                                  # to update an existing grade:
+                                  grade_id=None,
+                                  # to add a grade for an existing assignment:
+                                  assignment_id=None, 
+                                  # to create a new assignment:
+                                  description='(Assignment for calculated grade)',
+                                  due_date=datetime.date.today(),
+                                  grade_type=None,
+                                  weight='CALC'):
+            if not name and not (assignment_id or grade_id):
+                raise ValueError("No assignment name given for calculated grade.")
+            if value is None: # missing values not allowed, but 0/False/etc. OK
+                raise ValueError("No value given for calculated grade %s." % name)
+
+            if grade_id:
+                db.update_grade(self.db_connection,
+                                student_id=student_id,
+                                grade_id=grade_id,
+                                value=value)
+                return grade_id
+
+            if not assignment_id:
+                try:
+                    assignment_id = db.ensure_unique(db.select_assignments(
+                        self.db_connection,
+                        course_id=self.course_id,
+                        name=name))
+                except db.NoRecordsFound:
+                    assignment_id = db.create_assignment(
+                        self.db_connection,
+                        course_id=self.course_id,
+                        name=name,
+                        description=description,
+                        grade_type=grade_type,
+                        due_date=due_date,
+                        weight=weight)
+                # MultipleRecordsFound should propagate
+                
+            # avoid storing calculated grades multiple times
+            try:
+                grade_id = db.ensure_unique(
+                    db.select_grades(self.db_connection,
+                                     student_id=student_id,
+                                     assignment_id=assignment_id))
+            except db.NoRecordsFound:
+                grade_id = None
+                                            
+            row_id = db.create_or_update_grade(
+                self.db_connection,
+                student_id=student_id,
+                assignment_id=assignment_id,
+                grade_id=grade_id,
+                value=value)
+
+            return row_id
+ 
+        
+                                  
+        course = db.select_courses(self.db_connection,
+                                   course_id=self.course_id)[0]
+        safe_num = course['number'].replace('-', '_').replace('.', '_')
+        calc_name = ('calculate_grade_' + safe_num + '_' +
+                     course['semester'].lower() + str(course['year']))
         calc_func = getattr(user_calculators, calc_name, None)
 
         if not calc_func:
@@ -672,22 +888,32 @@ class SimpleUI(BaseUI):
 
         students = db.select_students(self.db_connection,
                                       course_id=self.course_id)
-        assignments = db.select_assignments(self.db_connection,
-                                            course_id=self.course_id)
+        all_grades = db.select_grades_for_course_members(
+                self.db_connection,
+                course_id=self.course_id)
         
         for s in students:
-            grades = db.select_grades(self.db_connection,
-                                      student_id=s[0],
-                                      course_id=self.course_id)
+            grades = filter(lambda r: (r['student_id'] == s['id'] and
+                                       r['weight'] != 'CALC'),
+                            all_grades)
 
-            if len(grades) != len(assignments):
-                # TODO: something more sophisticated here
-                # skip? pass to grade function anyway? user-configurable behavior?
-                print ("Warning: %s does not have a grade for all assignments "
-                       "in this course." % self.student_formatter(s))
-                
-            grade_dict = calc_func(db.GradeDict(grades))
-            grade_dict.save(self.db_connection)
+            try:
+                calculated_grades = calc_func(grades)
+            except Exception as e:
+                print ("Failed to calculate grades for %s. "
+                       "Error was: %s.  Skipping..." %
+                       (self.student_formatter(s), e))
+                continue
+            if type(calculated_grades) is dict:
+                # transpose to the list format to use save_calculated_grades
+                calculated_grades = [
+                    {'name': k, 'value': v}
+                    for k, v in calculated_grades.items()]
+
+            for cg in calculated_grades:
+                save_calculated_grade(s['id'], **cg)
+
+        print "Grade calculations ran successfully.\n"
             
 
     def exit(self):

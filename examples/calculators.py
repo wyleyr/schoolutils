@@ -21,24 +21,100 @@ Sample grade calculation function file
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 # 02110-1301, USA.
 
-from schoolutils.grading import grader as g
+from schoolutils.grading import calculator_helpers as ch
 
-# Every grade calculation function consumes a dictionary containing
-# entered grades for one student and returns a dictionary containing
-# both the entered grades and the calculated grades.
-def calculate_grade_25A_fall2012(student_grades):
-    """Calculates the unweighted average of letter grades for Papers
-       1--3 and the exam grade.
-       Calculated grades are:
-         Grade average (4.0 scale)
-         Final grade (letter grade)
-    """
-    entered_grades = ["Paper 1", "Paper 2", "Paper 3", "Exam grade"]
+# Every grade calculation function should be named like:
+#   calculate_grade_<course number>_<semester><year>
+# You should replace any characters in the course number which
+# cannot appear in Python identifiers (e.g., '.' or '-') with '_'
 
-    avg = g.letter_grade_average(student_grades, entered_grades)
-    student_grades["Grade average"] = avg
-    student_grades["Final grade"] = g.points_to_letter(avg)
+# Every grade calculation function must consume a set of database rows
+# representing the entered grades for one student and return a
+# dictionary, or list of dictionaries, representing the calculated
+# grades.
 
-    return student_grades
+# Here's a simple example:
+def calculate_grade_146_spring2013(rows):
+    # Unpack the data from the database rows:
+    # unpack_entered_grades returns co-indexed lists of
+    # grade values, weights, types, and assignment names for entered grades
+    vals, weights, types, assignment_names = ch.unpack_entered_grades(rows)
+
+    # Do the actual calculations:
+    # letter_grade_average converts each of the letter grade values to
+    # a 4.0 scale, then takes a weighted average.
+    # (Here we are assuming all the grades are letter grades.)
+    avg = ch.letter_grade_average(vals, weights=weights)
+    # points_to_letter converts the average back to a letter grade
+    final = ch.points_to_letter(avg)
+
+    # Return a representation of the calculated grades:
+    # In this simple case, we just return a dictionary whose keys name
+    # the calculated fields (i.e., the `assignments' these grade values are
+    # associated with), and whose values are the calculated values
+    # for this student.
+    return {
+        'Paper average': avg,
+        'Final grade': final,
+    }
+
+
+# And here's a more complicated example:
+def calculate_grade_146_spring2013(rows):
+    # Instead of unpacking the data in rows, we can operate with it directly.
+    # Each row has the following fields (see the documentation for
+    # schoolutils.grading.db.select_grades_for_course_members), which can be
+    # accessed like dictionary keys:
+    # assignment_id, assignment_name, weight, grade_type, grade_id, student_id, value
+    # For example:
+    paper_grades = []
+    exercise_grades = []
+    for r in rows:
+        if r['grade_type'] == 'letter':
+            paper_grades.append(r['value'])
+        elif r['grade_type'] == 'percentage':
+            exercise_grades.append(r['value'])
+        # etc. ...
+
+    # do calculations here on different grade types...
+
+    # When it's time to return the calculated grades, we can also
+    # return a list of dictionaries.  In this case, each dictionary
+    # specifies a number of fields describing each calculated grade.
+    # It can include the following fields:
+    #   name (required): a name for the (type of) calculated grade
+    #   value (required): the grade value for this student
+    #   description: a description of this type of grade
+    #   grade_type: the grade type, e.g., 'letter'
+    #   due_date: a datetime.date 'due date' for this type of grade
+    #           (defaults to the current date; useful because due dates
+    #            are used to order assignment columns when editing and
+    #            exporting grades)
+    #   weight: a weight for this type of grade
+    #           (defaults to 'CALC', a special value that indicates
+    #            this is a calculated grade type rather than an entered
+    #            grade type)
+    # You can also use this mechanism to update existing grades, or store
+    # grades for which no value was entered for this student.  To do so,
+    # include one of these keys:
+    #   grade_id: this updates an existing grade (by its primary key)
+    #   assignment_id: this creates a new grade for an existing assignment
+    # In this case, the 'name' key is optional, but 'value' is still required.
+    return [
+        dict(name='Paper average',
+             value=avg,
+             description='Weighted average of paper grades',
+             grade_type='4points'),
+        dict(name='Final grade',
+             value=final,
+             description='Raw letter grade',
+             grade_type='letter'),
+        # update an existing grade:
+        dict(grade_id=some_grade_id,
+             value=new_value)
+        # create grade for assignment, e.g., if no value was previously entered:
+        dict(assignment_id=some_assignment_id,
+             value='F')
+        ]
 
 

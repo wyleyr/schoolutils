@@ -43,6 +43,16 @@ class NoRecordsFound(GradeDBException):
 class MultipleRecordsFound(GradeDBException):
     pass
 
+def connect(path):
+    """Create a connection to a grade database at the given path.
+       Returns a sqlite3.Connection object appropriately initialized
+         for the grading application.
+    """
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+
+    return conn
+    
 def gradedb_init(db_connection):
     """Create a new SQLite database for storing grades.
        Creates a database with tables:
@@ -192,13 +202,18 @@ def select_assignments(db_connection, assignment_id=None, course_id=None,
                        year=None, semester=None, name=None):
     """Return a result set of assignments.
        The rows in the result set have the format:
-       (assignment_id, course_id, assignment_name, due_date)
+       (assignment_id, course_id, assignment_name, due_date, grade_type, weight,
+         description)
     """
     base_query = """
-    SELECT assignments.id, courses.id, assignments.name, assignments.due_date
+    SELECT assignments.id, courses.id AS course_id,
+           assignments.name, assignments.due_date,
+           assignments.grade_type, assignments.weight, assignments.description
     FROM assignments, courses
     ON assignments.course_id=courses.id
     %(where)s
+    ORDER BY CASE WHEN assignments.weight='CALC' THEN 1 ELSE 0 END,
+             assignments.due_date ASC;
     """
     constraints, params = make_conjunction_clause(
         ['assignments.id', 'courses.year', 'courses.semester',
@@ -478,8 +493,8 @@ def delete_course_members(db_connection, member_id=None, course_id=None,
 
     return num_changes(db_connection)
     
-def select_grades(db_connection, student_id=None, course_id=None,
-                  assignment_id=None):
+def select_grades(db_connection, grade_id=None, student_id=None,
+                  course_id=None, assignment_id=None):
     """Get a result set of grades for a given student or course.
        The rows in the result set have the format:
        (grade_id, student_id, course_id, assignment_id, assignment_name,
@@ -487,18 +502,57 @@ def select_grades(db_connection, student_id=None, course_id=None,
        course_id may be supplied to limit results to one course.
     """
     base_query = """
-    SELECT grades.id, students.id, assignments.course_id, assignments.id,
-           assignments.name, grades.value
+    SELECT grades.id,
+           students.id AS student_id,
+           assignments.course_id AS course_id, assignments.id AS assignment_id,
+           assignments.name AS assignment_name,
+           grades.value
     FROM grades, assignments, students
     ON grades.assignment_id=assignments.id AND grades.student_id=students.id
     %(where)s
     """
      
     constraints, params = make_conjunction_clause(
-        ['students.id', 'assignments.course_id', 'assignments.id'],
-        [student_id, course_id, assignment_id])
+        ['grades.id', 'students.id', 'assignments.course_id', 'assignments.id'],
+        [grade_id, student_id, course_id, assignment_id])
     query = add_where_clause(base_query, constraints)
    
+    return db_connection.execute(query, params).fetchall()
+
+def select_grades_for_course_members(db_connection, student_id=None, course_id=None):
+    """Select grades for members of a given course, for all assignments in that course.
+       The purpose of this function is to return a result set which contains all the
+       information necessary for calculating grades in simple cases.
+
+       This function does two things differently than select_grades:
+       1) The result set contains, for every course member, a row for every
+          assignment in the course, regardless of whether the student has a grade
+          for that assignment or not.  (If a student does not have a grade for a
+          given assignment, the grades.value field is simply NULL.)
+       2) The result set contains additional fields necessary for calculating grades,
+          namely, assignments.weight, assignments.grade_type.
+
+       The result set has the following columns:
+       assignment_id, assignment_name, weight, grade_type, grade_id, student_id, value
+    """
+    base_query = """
+    SELECT assignments.id AS assignment_id,
+           assignments.name AS assignment_name,
+           assignments.weight,
+           assignments.grade_type,
+           course_memberships.student_id,
+           grades.id AS grade_id,
+           grades.value
+    FROM (course_memberships, assignments USING (course_id))
+         LEFT OUTER JOIN grades ON (course_memberships.student_id=grades.student_id AND assignments.id=grades.assignment_id)
+    %(where)s;
+    """
+
+    constraints, params = make_conjunction_clause(
+        ['course_memberships.course_id', 'course_memberships.student_id'],
+        [course_id, student_id])
+    query = add_where_clause(base_query, constraints)
+
     return db_connection.execute(query, params).fetchall()
 
 def create_grade(db_connection, assignment_id=None, student_id=None, value=None,
@@ -515,7 +569,7 @@ def create_grade(db_connection, assignment_id=None, student_id=None, value=None,
     """
     fields, places, params = make_values_clause(
         ['assignment_id', 'student_id', 'value', 'timestamp'],
-        [course_id, student_id, value, timestamp])
+        [assignment_id, student_id, value, timestamp])
     query = base_query % {'fields': fields, 'places': places}
     db_connection.execute(query, params)
 
@@ -546,119 +600,32 @@ def create_or_update_grade(db_connection, grade_id=None, assignment_id=None,
     
     return last_insert_rowid(db_connection)
 
-    
-#
-# for interfacing with grading functions:
-# 
-class GradeDict(dict):
-    """Represents a set of a single student's grades in a single course.
-
-       This class acts like a dictionary, but internally keeps track
-       of database values (e.g. primary keys) so that grade values can
-       be saved in the database with ease.  Assignment names are used
-       as keys; these map to grade values.
+def update_grade(db_connection, grade_id=None, value=None):
+    """Update a record of an existing grade.
+       Returns the id of the updated row.
+       
+       This function is, for now, intentionally hobbled: you can only
+       update a grade's value field, and you can only select a grade
+       by its id field.  (Thus you may only update one grade.)  The
+       timestamp will be automatically updated.
     """
-    def __init__(self, rows):
-        """Initialize with a set of database rows.
-           Each row should be formatted like:
-           (grade_id, student_id, course_id, assignment_id, assignment_name,
-             grade_value)
-           as e.g. produced by select_grades
-        """
-        # a single, unique student_id is necessary so that we can
-        # correctly enter new grades into the db
-        extra_student_ids = filter(lambda r: r[1] != rows[0][1], rows)
-        if extra_student_ids:
-            raise ValueError("student_id must be same in rows: %s" % rows)
-        else:
-            self.student_id = rows[0][1]
-
-        # a single, unique course_id is necessary so that we can
-        # correctly enter new assignments into the db  
-        extra_course_ids = filter(lambda r: r[2] != rows[0][2], rows)
-        if extra_course_ids:
-            raise ValueError("course_id must be same in rows: %s" % rows)
-        else:
-            self.course_id = rows[0][2]
-        
-        # ensure assignment names are unique in rows
-        assignment_names = [row[4] for row in rows]
-        for i in range(len(assignment_names)):
-            if assignment_names[i] in assignment_names[i+1:]:
-                raise ValueError("Assignment names must be unique in rows: %s" %
-                                 rows)
-        
-        # internally, the grades are maintained as a dictionary
-        # mapping assignment names to a list of the values needed to
-        # store these grades back in the database
-        self._grades = dict([(r[4], list(r)) for r in rows])
-
-    def __getitem__(self, key):
-        return self._grades[key][5]
-
-    def __setitem__(self, key, val):
-        if key in self._grades:
-            self._grades[key][5] = val
-        else:
-            # grade_id and assignment_id not available;
-            # they must be supplied at save time
-            self._grades[key] = [None, self.student_id, self.course_id, None,
-                                 key, val]
-
-    def __iter__(self):
-        return self.keys()
-
-    def __repr__(self):
-        return str(self)
-
-    def __str__(self):
-        return '{%s}' % ', '.join(["'%s': %s" % t for t in self.items()]) 
+    if not grade_id:
+        raise sqlite3.IntegrityError("grade_id is required to update a grade")
+    if not value:
+        raise sqlite3.IntegrityError("value is required to update a grade")
     
-    def keys(self):
-        return self._grades.keys()
-
-    def values(self):
-        return [v[5] for v in self._grades.values()]
-
-    def items(self):
-        return list(self.iteritems())
-
-    def iteritems(self):
-        return (t for t in zip(self.keys(), self.values()))
+    query = """
+    UPDATE grades
+    SET value=?, timestamp=?
+    WHERE id=?;
+    """
+    params = (value, datetime.datetime.now(), grade_id)
+    db_connection.execute(query, params)
     
-    def save(self, db_connection):
-        """Update or insert grades into grade database.
-           Returns a list of ids of the affected rows.
-        """
-        # TODO: transaction management here?
-        ids = []
-        for grade_id, student_id, course_id, assignment_id, assignment_name, \
-                grade_val in self._grades.values():
-            if not assignment_id:
-                try:
-                    assignment_id = ensure_unique(
-                        select_assignments(db_connection, course_id=course_id,
-                                           name=assignment_name))
-                except NoRecordsFound:
-                    desc = "Assignment row generated automatically by GradeDict"
-                    assignment_id = create_assignment(
-                        db_connection,
-                        course_id=course_id,
-                        name=assignment_name,
-                        description=desc)
-                # MultipleRecordsFound exception should propagate
+    return grade_id
 
-            row_id = create_or_update_grade(
-                db_connection,
-                grade_id=grade_id,
-                student_id=student_id,
-                assignment_id=assignment_id,
-                value=grade_val)
-            ids.append(row_id)
-
-        return ids
-                             
-            
+   
+           
 #            
 # utilities
 #

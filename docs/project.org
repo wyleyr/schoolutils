@@ -1,5 +1,5 @@
 * Tasks 
-** WAITING [#A] Interfaces for calculating grades		  :grader:ui:
+** DONE [#A] Interfaces for calculating grades			  :grader:ui:
    - this probably needs to be done in tandem with system configuration
    - need way to map current course to a grading function:
      + naming convention?  e.g. calculate_grades_25A_fall2012?
@@ -18,7 +18,7 @@
    currently all lookups are just exact matches, but this is going to
    become cumbersome for text fields (esp. names)
 ** DONE [#A] Interface to see/add/edit students in current course   :ui:edit:
-** TODO [#A] Interface to see/edit grades in current assignment	    :ui:edit:
+** DONE [#A] Interface to see/edit grades in current assignment	    :ui:edit:
 ** TODO [#B] Interfaces to reporting functions		       :ui:reporting:
 ** TODO [#D] More sophisticated UI? Curses-based? 			 :ui:
 ** TODO [#C] Separation of 'view' and 'controller' UI code		 :ui:
@@ -61,7 +61,10 @@
    No idea if it works, or how, on Windows or other Unixes.  May need
    to revisit in the future.
 ** DONE [#A] Write docs for initial release!				:doc:
-** TODO [#D] Make compatible with Python 3			  :packaging:
+** TODO [#C] Make compatible with Python 3			  :packaging:
+   - actually we are not far off, here
+   - 2to3 reveals that pretty much the only changes that need to be made
+     are for print statements (<2013-01-19 Sat>)
 ** DONE [#A] Figure out the best thing to do with user validators     :ui:db:
    useful validators include:
    - sid
@@ -76,8 +79,11 @@
           return user_validators.sid(s)
        else:
           # ...
-** TODO [#A] Interfaces to edit existing assignments, courses, grades :ui:edit:
+** INPROGRESS [#A] Interfaces to edit existing assignments, courses, grades :ui:edit:
    - need to be able to modify and delete these
+   - [X] edit_grades
+   - [ ] edit_courses
+   - [ ] edit_assignments
      
 ** DONE [#A] Make executable scripts with CLI options		     :ui:bin:
    - bin/grade: start the grader
@@ -88,7 +94,7 @@
      + -g : calculate grades
      + -i : import students
      + -x : export grades
-** TODO [#B] Interface for exporting (sorted) lists of grades	  :ui:export:
+** DONE [#B] Interface for exporting (sorted) lists of grades	  :ui:export:
 ** TODO [#A] Test and fix nested KeyboardInterrupt loop breakout	 :ui:
 ** TODO [#B] Figure out institution setup				 :ui:
    - need an API definition for institution modules
@@ -96,18 +102,230 @@
      + csv formats?
    - institution var in user_config
    - import user_institution module in config? 
+   
+   Proposal:
+   1) Institution modules provide the following:
+      - a UI subclass that provides a few specific methods, and can
+	override any of the actions of the BaseUI/SimpleUI classes
+      - a validators module that will be loaded when the user
+        specifies an institution but does not provide a validators.py
+   2) The institution UI subclass API:
+      - csv_to_student_dicts(filename)
+      - student_dicts_to_csv(filename, student_dicts)
+      - csv_to_grade_dicts(filename)
+      - grade_dicts_to_csv(filename, grade_dicts)
+   3) Institution modules must (in __init__.py) export this UI
+      subclass as InstitutionUI
+   4) In schoolutils.config, we:
+      - import user_config
+      - if user_config has 'institution' attribute, 
+	user_institution = __import__(user_config.institution, fromlist=['schoolutils', 'institutions'])
+	UIClass = __import__('InstitutionUI', fromlist=['schoolutils',
+                             'institutions', user_config.institution])
+      - use user_config.institution to find a validators module, if
+        the user provides none
+   5) in bin/grade, we:
+      - run schoolutils.config.UIClass().main_loop
+
 ** TODO [#B] Improve change_database, change_course, change_assignment, etc. :ui:
    - edge case: should not have to retype db path if provided on CLI
      but no database exists there yet
    - implement current_courses option
    - incremental search for course, assignment?
+   - fallback to create new assignment from selection menu seems to be
+     broken; also, the extra step here seems totally extraneous
    - calculate_all_grades interface to loop over all current courses
    
-** TODO [#A] Fix grade calculation when grades for a given student are missing
+** DONE [#A] Fix grade calculations				  :bug:ui:db:
+   - problem 1: if grades are missing, we crash with a KeyError
+   - problem 2: if user works around this by trying to use dictionary methods
+     on GradeDict, data corruption happens *really easily*
+     e.g. the following clobbered not just calculated grades, but ALL
+     grades for the given course:
+    for k in assignments:
+        if k not in student_grades: # broken
+            student_grades[k] = 'F'
+
+   - problem 3: running grade calculation multiple times might lead to multiple
+     grade values for calculated grades(?) -- see GradeDict.save()
+   - problem 4: some calculated fields don't seem to update when calculations
+     are re-run.
+     The case I have observed here is if all the entered grades are
+     set to 'F', a calculated grade "Paper average" ends up as null
+     rather than 0.0, and re-running calculations doesn't fix it.
+     This seems to be an extreme edge case caused by SQLite's dynamic typing;
+     it doesn't happen if the calculated value is non-zero.
+*** Ideas for a better interface
+    1) Need to make API more robust.  Abstract over db operations, so
+       that we can have a functional data flow, but keep things
+       flexible enough to accommodate different grading schemes.
+    2) Remember that the primary concept here is
+       grades-for-assignments, not grades.  User will often want to
+       iterate over all the assignments for the course, not just
+       those for which the student has a grade.  On the other hand,
+       some grading schemes don't require students to turn in every
+       assignment.  
+    3) User may sometimes want to update entered grades, not just
+       create calculated grades.  (e.g., fill in 'F' for missing
+       grades)
+    4) It would be good to guarantee idempotence: re-running grade
+       calculations should never result in data loss/change for
+       entered grades.  But this is in tension with (3).
+    5) Should also plan for the possibility of multiple grades
+       recorded for a given student on an assignment.  Users may want
+       to select the most recent grade, or the highest, etc.
+    6) Users may want to compute grades on a per-class rather than
+       per-student basis, e.g., to compute final grades on a curve
+       based on average scores.  (This would be a big change.)
+
+Something like this?       
+#+BEGIN_SRC python
+  from schoolutils.grading import calc_helpers as ch
+  
+  def calculate_grade_146_fall2013(rows):
+      # simple case: just need co-indexed lists of grade values, weights, etc.
+      vals, weights, types, assignment_names = ch.unpack_entered_grades(rows)
+  
+      # the actual calculations
+      avg = ch.letter_grade_average(vals, weights=weights, missing='F')
+      final = ch.points_to_letter(avg)
+  
+      # simple case: just a name for the calculated field and a value 
+      # other fields in assignment and grades tables automatically populated
+      return {
+          'Paper average': avg,
+          'Final grade': final,
+      }
+  
+      # for more complicated needs: list of dictionaries specifying
+      # name, description, type, value
+      # optional: include grade_id as a key to update an existing grade,
+      # or assignment_id to create a new grade for an existing assignment
+      return [
+          dict(name='Paper average',
+               value=avg,
+               description='Weighted average of paper grades',
+               grade_type=ch.FOUR_POINT),
+          dict(name='Final grade',
+               value=final,
+               description='Raw letter grade',
+               grade_type=ch.LETTER),
+          # update existing grade
+          dict(grade_id=some_grade_id,
+               value=new_value)
+          # create grade for assignment
+          dict(assignment_id=some_assignment_id,
+               value='F')
+          ]
+  
    
+#+END_SRC       
+
+On the other hand, maybe these considerations are pointing toward a
+two-tiered API.  The two kinds of calculation function could be
+combined, so that e.g. one could run 
+#+BEGIN_SRC python
+  # simple case: per-student calculations based on
+  # grade values, weights, types, and assignment names.
+  # Return dictionary mapping names of calculated grades to values.
+  # Could also allow a list of dictionaries as described above.
+  def calculate_student_grade_12A_fall2012(values, weights, types, names):
+      # ...
+      return {
+          'Homework average': avg,
+          'Raw final score': final,
+      }
+  
+  # complex case: full access to database, convenience methods,
+  # procedural rather than functional API
+  def calculate_complex_grade_12A_fall2012(marshal):
+      # marshal provides db connection, as well as convenience methods for
+      # getting grades for individual students as well as the whole class,
+      # etc. etc.
+      class_exam_scores = marshal.all_grades_for('Final exam (raw score)')
+      boxes = ch.make_curve(class_exam_scores, min=40) # etc.
+      for s in marshal.students():
+          # ... assign each student a letter grade based on curve, etc.
+          score = marshal.grade_for_student(s, 'Final exam (raw score)')
+          grade = ch.score_to_curved_grade(score, boxes)
+          marshal.calculated_grade('Final exam (curved)', type=letter)
+  
+      # or simply do database manipulations yourself:
+      dbc = marshal.db_connection
+      grades = db.select_grades(dbc, course_id=marshal.course_id)
+      # etc.
+#+END_SRC
 ** TODO [#A] Testing framework					    :testing:
    - need to write tests for bugs, automate testing
    - use virtualenv to test empty configuration
+** WAITING [#B] Distinguish weight vs. possible points?		      :ui:db:
+   - currently, assignments.weight field is intended to be interpreted
+     as either percentage of final grade (for most grade types) OR
+     number of possible points (for 'points' grades)
+   - but this scheme does not permit giving 'points' grades
+     fractional weights of a final grade -- in effect it assumes that
+     either all the grades in a course are of type 'points' or none are.
+   - do we need a way around this?
+     + Yes: the program is not complete unless there are library
+       functions for calculating grades in a course with mixed grade types
+     + No: grade calculation functions can look up the weight fields
+       on the various assignments (or hard code them) and compute
+       accordingly, and that's the user's responsibility
+     + Think I'm in the 'No' camp for now
+** DONE [#B] Re-architect database selections			      :ui:db:
+   - make use of connection.row_factory, perhaps sqlite3.Row
+   - return cursors instead of always calling fetchall()?
+   - main reasons this is needed:
+     1) relying on fixed positions for fields produced by select_*
+        functions is extremely(!) fragile
+     2) GradeDict does not seem to be the right abstraction; need a better
+	way for user-defined calculators to get all the right information
+	they need about student grades (and locate it in the data
+        passed in) without needing to hit the db.  It would be nice
+        to do something like
+	def my_grade_calculator(grade_rows):
+	    weights = map(lambda r: r['weight'], grade_rows)
+	    grades = map(lambda r: r['value'], grade_rows)
+	    # ...
+
+** TODO [#C] Replace db.last_insert_rowid() with native sqlite3 call 	 :db:
+** DONE [#A] Completion message for grade calculation, export		 :ui:
+** TODO [#B] Use itertools.groupby() to save database hits?  :ui:performance:
+   instead of hitting database with a new query for each student, we
+   can do e.g.
+#+BEGIN_SRC python
+  import itertools
+  
+  # get all the grade rows for the whole class
+  all_grades = db.select_grades_for_course_members(db_connection, course_id=course_id)
+  
+  # then loop over them by student
+  for student_id, rows in itertools.groupby(all_grades, lambda r: r['student_id']):
+      # here, rows will be just grades for one student...
+      # this assumes the rows are already grouped by student_id field,
+      # which is presently true but maybe doesn't need to remain so
+#+END_SRC
+
+** WAITING [#A] Decide how to handle multiple grades for a single assignment :ui:db:
+Problem:
+  1) It seems natural to allow multiple grades for the same student
+     and assignment
+     - can treat database as a log; never destroy old data, just
+       layer on top
+     - some teaching settings might allow this (e.g., revisions?)
+  2) But allowing multiple grades presents some thorny UI problems.
+     Which, if any, is the `right' grade to display/update/export?
+
+For now, *I* only need one grade per assignment per student, so I am
+going to continue assuming this, but code may need to be updated in future.
+
+Affected functions:
+    SimpleUI: edit_grades, export_grades, calculate_grades
+       
+** TODO [#C] New UI class PipeUI to handle CLI usage?			 :ui:
+   so we could say things like:
+   $ grade -c 146 -s spring -y 2013 --import-students < student_list.txt
+   $ grade -c 146 -s spring -y 2013 --calculate-grades --export-grades > grades.csv
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so
@@ -118,3 +336,4 @@
      same name (or similar names with the _like version); but this edge
      case is rare enough that it probably won't happen for other
      reasons, so I won't fix it for now
+     

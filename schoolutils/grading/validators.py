@@ -71,10 +71,10 @@ def grade_type(s):
     """Ensure s is a valid grade type.
 
        By default, converts s to lowercase and ensures it is one of
-       'letter', 'points', or 'percentage'.
+       'letter', '4points', 'points', or 'percentage'.
     """
     t = s.strip().lower()
-    if t not in ['letter', 'points', 'percentage']:
+    if t not in ['letter', '4points', 'points', 'percentage']:
         raise ValueError("Not a grade type: %s" % s)
 
     return t
@@ -192,3 +192,25 @@ def email(s):
     if '@' not in e:
         raise ValueError("%s does not appear to be an email address" % s)
     return e
+
+# Other helpers:
+def validator_for_grade_type(gt):
+    """Return a validator for grades with grade type gt.
+
+       This function maps grade types to validators as follows:
+         'letter': validators.letter_grade
+         '4points': validators.four_point_grade
+         'percentage': validators.percentage_grade
+         'points': int
+         any other type: str 
+    """
+    type_map = {
+        'letter': letter_grade,
+        '4points': four_point_grade,
+        'percentage': percentage_grade,
+        'points': int
+    }
+    try:
+        return type_map[gt]
+    except KeyError:
+        return str
