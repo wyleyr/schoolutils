@@ -866,11 +866,13 @@ class SimpleUI(BaseUI):
 
         students = db.select_students(self.db_connection,
                                       course_id=self.course_id)
-        for s in students:
-            grades = db.select_grades_for_course_members(
+        all_grades = db.select_grades_for_course_members(
                 self.db_connection,
-                student_id=s['id'],
                 course_id=self.course_id)
+        
+        for s in students:
+            grades = filter(lambda r: r['student_id'] == s['id'],
+                            all_grades)
 
             try:
                 calculated_grades = calc_func(grades)
