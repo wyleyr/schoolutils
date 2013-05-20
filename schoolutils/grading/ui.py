@@ -537,94 +537,64 @@ class SimpleUI(BaseUI):
         """Edit grades.
            Edit a table of grades for the current course.
         """
-        assignments = db.select_assignments(self.db_connection,
-                                            course_id=self.course_id)
-        students = db.select_students(self.db_connection,
-                                      course_id=self.course_id)
-        
-        row_fmt =  "{last_name: <15s} {first_name: <20s}  {grades: <60s}"
-        header = row_fmt.format(last_name="Last name", first_name="First name",
-                                # col headers are assignment names
-                                grades="".join("{0: <10s} ".format(a['name'])
-                                               for a in assignments))
+        def formatter(tbl_row):
+            return row_fmt.format(name=self.student_formatter(tbl_row['student']),
+                                  **dict((g['assignment_name'], str(g['value']))
+                                         for g in tbl_row['grades']))
 
-        def grade_row_for_assignment(grades, assignment):
-            try:
-                # extract grade row which matches assignment id
-                row = filter(lambda g: g['assignment_id'] == assignment['id'],
-                             grades)[0]
-            except IndexError:
-                row = None
-            return row
-
-        def grade_val_for_assignment(grades, assignment):
-            try:
-                val = grade_row_for_assignment(grades, assignment)['value']
-            except TypeError: # if None is returned
-                val = None
-            return val
-                
-        def formatter(row):
-            last_name, first_name = row['student']['last_name'], row['student']['first_name']
-            grades = row['grades']
-            grade_vals = [grade_val_for_assignment(grades, a) 
-                          for a in assignments]
-            grade_str = "".join("{0: <10s} ".format(str(v)) for v in grade_vals)
-            return row_fmt.format(last_name=last_name, first_name=first_name,
-                                  grades=grade_str)
-
-        def editor(row):
-            student_id, last_name, first_name, sid, email = row['student']
-            grades = row['grades']
-            
-            print "Editing grades for %s, %s." % (last_name, first_name)
+        def editor(tbl_row):
+            print "Editing grades for %s." % self.student_formatter(tbl_row['student'])
             
             prompt = "New grade value for %s (default: %s): "
-            for a in assignments:
-                assignment_name = a['name']
-                old_row = grade_row_for_assignment(grades, a)
-                if old_row:
-                    old_val = old_row['value']
-                else:
-                    old_val = None
-                    
-                grade_validator = validators.validator_for_grade_type(a['grade_type'])
-
-                new_val = typed_input(prompt % (assignment_name, old_val),
+            any_updates = False
+            for g in tbl_row['grades']:
+                grade_validator = validators.validator_for_grade_type(g['grade_type'])
+                old_val = g['value']
+                new_val = typed_input(prompt % (g['assignment_name'], old_val),
                                       grade_validator, default=old_val)
                 if new_val == old_val:
                     continue
-                elif new_val and old_row:
-                    # update the existing grade value in the db
-                    grade_id = old_row['id']
-                    db.update_grade(self.db_connection, grade_id=grade_id,
-                                    value=new_val)
-                    # modify in place so changes appear in table view
-                    idx = grades.index(old_row)
-                    grades[idx] = db.select_grades(self.db_connection,
-                                                   grade_id=grade_id)[0]
                 elif new_val:
-                    # no existing grade value in db, so create one,
-                    # and add the row to the data used to generate the
-                    # editing table
-                    new_row_id = db.create_or_update_grade(self.db_connection,
-                                                           student_id=student_id,
-                                                           assignment_id=a['id'],
-                                                           value=new_val)
-                    new_row = db.select_grades(self.db_connection,
-                                               grade_id=new_row_id)[0]
-                    row['grades'].append(new_row)
-                
-            return row
- 
-        rows = []
-        for s in students:
-            rows.append({
-              'student': s,
-              'grades': db.select_grades(self.db_connection,
-                                         course_id=self.course_id,
-                                         student_id=s['id'])
-            })
+                    any_updates = True
+                    new_grade_id = db.create_or_update_grade(
+                        self.db_connection,
+                        student_id=g['student_id'],
+                        assignment_id=g['assignment_id'],
+                        grade_id=g['grade_id'], # may be None if grade didn't exist
+                        value=new_val)
+
+            if any_updates:
+                return {
+                    'student': row['student'],
+                    'grades': db.select_grades_for_course_member(
+                        self.db_connection,
+                        course_id=self.course_id,
+                        student_id=row['student']['id'])
+                    }
+            else:
+                return tbl_row
+
+            
+        students = db.select_students(self.db_connection,
+                                      course_id=self.course_id)
+        all_grades = db.select_grades_for_course_members(
+            self.db_connection,
+            course_id=self.course_id)
+        rows = [
+            {'student': s,
+             'grades': filter(lambda r: r['student_id'] == s['id'],
+                               all_grades)}
+            for s in students]
+
+        assignments = db.select_assignments(self.db_connection,
+                                            course_id=self.course_id)
+        assignment_names = [a['name'] for a in assignments]
+        row_fmt = "{name: <35s}  "
+        for a in assignments_names:
+            row_fmt += "{" + a + ": <10s}"
+        
+        header = row_fmt.format(name="Student",
+                                **dict((a,a) for a in assignment_names))
     
         self.edit_table(rows, header, formatter, editor=editor)
         print "Grades updated successfully."
