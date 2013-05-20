@@ -590,7 +590,7 @@ class SimpleUI(BaseUI):
                                             course_id=self.course_id)
         assignment_names = [a['name'] for a in assignments]
         row_fmt = "{name: <35s}  "
-        for a in assignments_names:
+        for a in assignment_names:
             row_fmt += "{" + a + ": <10s}"
         
         header = row_fmt.format(name="Student",
