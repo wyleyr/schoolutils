@@ -23,16 +23,21 @@ Sample grade calculation function file
 
 from schoolutils.grading import calculator_helpers as ch
 
-# Every grade calculation function consumes a set of database rows
-# representing the grades for one student and returns a dictionary, or
-# list of dictionaries, representing the calculated grades.
+# Every grade calculation function should be named like:
+#   calculate_grade_<course number>_<semester><year>
+# You should replace any characters in the course number which
+# cannot appear in Python identifiers (e.g., '.' or '-') with '_'
+
+# Every grade calculation function must consume a set of database rows
+# representing the entered grades for one student and return a
+# dictionary, or list of dictionaries, representing the calculated
+# grades.
 
 # Here's a simple example:
 def calculate_grade_146_spring2013(rows):
     # Unpack the data from the database rows:
-    # Note that rows might contain grades for previously-calculated grades.
-    # unpack_entered_grades returns co-indexed lists of grade values,
-    # weights, types, and assignment names for entered grades
+    # unpack_entered_grades returns co-indexed lists of
+    # grade values, weights, types, and assignment names for entered grades
     vals, weights, types, assignment_names = ch.unpack_entered_grades(rows)
 
     # Do the actual calculations:

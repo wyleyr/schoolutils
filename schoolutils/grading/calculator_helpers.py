@@ -149,10 +149,6 @@ def unpack_entered_grades(rows):
     types = []
     assignment_names = []
     for r in rows:
-        # filter out rows which are for calculated grades
-        if r['weight'] == 'CALC':
-            continue
-
         values.append(r['value'])
         weights.append(r['weight'])
         types.append(r['grade_type'])

@@ -892,7 +892,8 @@ class SimpleUI(BaseUI):
                 course_id=self.course_id)
         
         for s in students:
-            grades = filter(lambda r: r['student_id'] == s['id'],
+            grades = filter(lambda r: (r['student_id'] == s['id'] and
+                                       r['weight'] != 'CALC'),
                             all_grades)
 
             try:
