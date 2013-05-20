@@ -540,8 +540,8 @@ def select_grades_for_course_members(db_connection, student_id=None, course_id=N
            assignments.name AS assignment_name,
            assignments.weight,
            assignments.grade_type,
+           course_memberships.student_id,
            grades.id AS grade_id,
-           grades.student_id,
            grades.value
     FROM (course_memberships, assignments USING (course_id))
          LEFT OUTER JOIN grades ON (course_memberships.student_id=grades.student_id AND assignments.id=grades.assignment_id)
