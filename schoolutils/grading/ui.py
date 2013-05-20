@@ -566,7 +566,7 @@ class SimpleUI(BaseUI):
             if any_updates:
                 return {
                     'student': tbl_row['student'],
-                    'grades': db.select_grades_for_course_member(
+                    'grades': db.select_grades_for_course_members(
                         self.db_connection,
                         course_id=self.course_id,
                         student_id=tbl_row['student']['id'])
