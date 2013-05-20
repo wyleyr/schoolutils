@@ -212,6 +212,8 @@ def select_assignments(db_connection, assignment_id=None, course_id=None,
     FROM assignments, courses
     ON assignments.course_id=courses.id
     %(where)s
+    ORDER BY CASE WHEN assignments.weight='CALC' THEN 1 ELSE 0 END,
+             assignments.due_date ASC;
     """
     constraints, params = make_conjunction_clause(
         ['assignments.id', 'courses.year', 'courses.semester',
