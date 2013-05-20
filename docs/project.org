@@ -1,5 +1,5 @@
 * Tasks 
-** WAITING [#A] Interfaces for calculating grades		  :grader:ui:
+** DONE [#A] Interfaces for calculating grades			  :grader:ui:
    - this probably needs to be done in tandem with system configuration
    - need way to map current course to a grading function:
      + naming convention?  e.g. calculate_grades_25A_fall2012?
@@ -79,8 +79,11 @@
           return user_validators.sid(s)
        else:
           # ...
-** TODO [#A] Interfaces to edit existing assignments, courses, grades :ui:edit:
+** INPROGRESS [#A] Interfaces to edit existing assignments, courses, grades :ui:edit:
    - need to be able to modify and delete these
+   - [X] edit_grades
+   - [ ] edit_courses
+   - [ ] edit_assignments
      
 ** DONE [#A] Make executable scripts with CLI options		     :ui:bin:
    - bin/grade: start the grader
@@ -133,7 +136,7 @@
      broken; also, the extra step here seems totally extraneous
    - calculate_all_grades interface to loop over all current courses
    
-** INPROGRESS [#A] Fix grade calculations			  :bug:ui:db:
+** DONE [#A] Fix grade calculations				  :bug:ui:db:
    - problem 1: if grades are missing, we crash with a KeyError
    - problem 2: if user works around this by trying to use dictionary methods
      on GradeDict, data corruption happens *really easily*
@@ -269,7 +272,7 @@ combined, so that e.g. one could run
        on the various assignments (or hard code them) and compute
        accordingly, and that's the user's responsibility
      + Think I'm in the 'No' camp for now
-** TODO [#B] Re-architect database selections			      :ui:db:
+** DONE [#B] Re-architect database selections			      :ui:db:
    - make use of connection.row_factory, perhaps sqlite3.Row
    - return cursors instead of always calling fetchall()?
    - main reasons this is needed:
@@ -286,7 +289,7 @@ combined, so that e.g. one could run
 	    # ...
 
 ** TODO [#C] Replace db.last_insert_rowid() with native sqlite3 call 	 :db:
-** TODO [#A] Completion message for grade calculation, export		 :ui:
+** DONE [#A] Completion message for grade calculation, export		 :ui:
 ** TODO [#B] Use itertools.groupby() to save database hits?  :ui:performance:
    instead of hitting database with a new query for each student, we
    can do e.g.
@@ -301,6 +304,8 @@ combined, so that e.g. one could run
       # here, rows will be just grades for one student...
       # this assumes the rows are already grouped by student_id field,
       # which is presently true but maybe doesn't need to remain so
+#+END_SRC
+
 ** WAITING [#A] Decide how to handle multiple grades for a single assignment :ui:db:
 Problem:
   1) It seems natural to allow multiple grades for the same student
@@ -317,7 +322,10 @@ going to continue assuming this, but code may need to be updated in future.
 Affected functions:
     SimpleUI: edit_grades, export_grades, calculate_grades
        
-** #+END_SRC
+** TODO [#C] New UI class PipeUI to handle CLI usage?			 :ui:
+   so we could say things like:
+   $ grade -c 146 -s spring -y 2013 --import-students < student_list.txt
+   $ grade -c 146 -s spring -y 2013 --calculate-grades --export-grades > grades.csv
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so
