@@ -565,11 +565,11 @@ class SimpleUI(BaseUI):
 
             if any_updates:
                 return {
-                    'student': row['student'],
+                    'student': tbl_row['student'],
                     'grades': db.select_grades_for_course_member(
                         self.db_connection,
                         course_id=self.course_id,
-                        student_id=row['student']['id'])
+                        student_id=tbl_row['student']['id'])
                     }
             else:
                 return tbl_row
@@ -589,7 +589,7 @@ class SimpleUI(BaseUI):
         assignments = db.select_assignments(self.db_connection,
                                             course_id=self.course_id)
         assignment_names = [a['name'] for a in assignments]
-        row_fmt = "{name: <35s}  "
+        row_fmt = "{name: <40s}  "
         for a in assignment_names:
             row_fmt += "{" + a + ": <10s}"
         
