@@ -299,8 +299,25 @@ combined, so that e.g. one could run
   # then loop over them by student
   for student_id, rows in itertools.groupby(all_grades, lambda r: r['student_id']):
       # here, rows will be just grades for one student...
-      
-#+END_SRC
+      # this assumes the rows are already grouped by student_id field,
+      # which is presently true but maybe doesn't need to remain so
+** WAITING [#A] Decide how to handle multiple grades for a single assignment :ui:db:
+Problem:
+  1) It seems natural to allow multiple grades for the same student
+     and assignment
+     - can treat database as a log; never destroy old data, just
+       layer on top
+     - some teaching settings might allow this (e.g., revisions?)
+  2) But allowing multiple grades presents some thorny UI problems.
+     Which, if any, is the `right' grade to display/update/export?
+
+For now, *I* only need one grade per assignment per student, so I am
+going to continue assuming this, but code may need to be updated in future.
+
+Affected functions:
+    SimpleUI: edit_grades, export_grades, calculate_grades
+       
+** #+END_SRC
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so

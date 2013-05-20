@@ -537,6 +537,10 @@ class SimpleUI(BaseUI):
         """Edit grades.
            Edit a table of grades for the current course.
         """
+        # TODO: handle case where student has multiple grades for an
+        # assignment Presently these are silently dropped in the
+        # display, but when editing, user is asked to enter new grades
+        # multiple times.
         def formatter(tbl_row):
             return row_fmt.format(name=self.student_formatter(tbl_row['student']),
                                   **dict((g['assignment_name'], str(g['value']))
