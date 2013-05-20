@@ -78,14 +78,23 @@ def calculate_grade_146_spring2013(rows):
     # specifies a number of fields describing each calculated grade.
     # It can include the following fields:
     #   name (required): a name for the (type of) calculated grade
-    #   description: a description of this grade
+    #   value (required): the grade value for this student
+    #   description: a description of this type of grade
     #   grade_type: the grade type, e.g., 'letter'
-    #   value: the grade value for this student
+    #   due_date: a datetime.date 'due date' for this type of grade
+    #           (defaults to the current date; useful because due dates
+    #            are used to order assignment columns when editing and
+    #            exporting grades)
+    #   weight: a weight for this type of grade
+    #           (defaults to 'CALC', a special value that indicates
+    #            this is a calculated grade type rather than an entered
+    #            grade type)
     # You can also use this mechanism to update existing grades, or store
     # grades for which no value was entered for this student.  To do so,
     # include one of these keys:
     #   grade_id: this updates an existing grade (by its primary key)
     #   assignment_id: this creates a new grade for an existing assignment
+    # In this case, the 'name' key is optional, but 'value' is still required.
     return [
         dict(name='Paper average',
              value=avg,
