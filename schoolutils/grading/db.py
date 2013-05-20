@@ -43,6 +43,16 @@ class NoRecordsFound(GradeDBException):
 class MultipleRecordsFound(GradeDBException):
     pass
 
+def connect(path):
+    """Create a connection to a grade database at the given path.
+       Returns a sqlite3.Connection object appropriately initialized
+         for the grading application.
+    """
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+
+    return conn
+    
 def gradedb_init(db_connection):
     """Create a new SQLite database for storing grades.
        Creates a database with tables:
@@ -196,7 +206,8 @@ def select_assignments(db_connection, assignment_id=None, course_id=None,
          description)
     """
     base_query = """
-    SELECT assignments.id, courses.id, assignments.name, assignments.due_date,
+    SELECT assignments.id, courses.id AS course_id,
+           assignments.name, assignments.due_date,
            assignments.grade_type, assignments.weight, assignments.description
     FROM assignments, courses
     ON assignments.course_id=courses.id
@@ -489,8 +500,11 @@ def select_grades(db_connection, grade_id=None, student_id=None,
        course_id may be supplied to limit results to one course.
     """
     base_query = """
-    SELECT grades.id, students.id, assignments.course_id, assignments.id,
-           assignments.name, grades.value
+    SELECT grades.id,
+           students.id AS student_id,
+           assignments.course_id AS course_id, assignments.id AS assignment_id,
+           assignments.name AS assignment_name,
+           grades.value
     FROM grades, assignments, students
     ON grades.assignment_id=assignments.id AND grades.student_id=students.id
     %(where)s
@@ -501,6 +515,42 @@ def select_grades(db_connection, grade_id=None, student_id=None,
         [grade_id, student_id, course_id, assignment_id])
     query = add_where_clause(base_query, constraints)
    
+    return db_connection.execute(query, params).fetchall()
+
+def select_grades_for_course_members(db_connection, student_id=None, course_id=None):
+    """Select grades for members of a given course, for all assignments in that course.
+       The purpose of this function is to return a result set which contains all the
+       information necessary for calculating grades in simple cases.
+
+       This function does two things differently than select_grades:
+       1) The result set contains, for every course member, a row for every
+          assignment in the course, regardless of whether the student has a grade
+          for that assignment or not.  (If a student does not have a grade for a
+          given assignment, the grades.value field is simply NULL.)
+       2) The result set contains additional fields necessary for calculating grades,
+          namely, assignments.weight, assignments.grade_type.
+
+       The result set has the following columns:
+       assignment_id, assignment_name, weight, grade_type, grade_id, student_id, value
+    """
+    base_query = """
+    SELECT assignments.id AS assignment_id,
+           assignments.name AS assignment_name,
+           assignments.weight,
+           assignments.grade_type,
+           grades.id AS grade_id,
+           grades.student_id,
+           grades.value
+    FROM (course_memberships, assignments USING (course_id))
+         LEFT OUTER JOIN grades ON (course_memberships.student_id=grades.student_id AND assignments.id=grades.assignment_id)
+    %(where)s;
+    """
+
+    constraints, params = make_conjunction_clause(
+        ['course_memberships.course_id', 'course_memberships.student_id'],
+        [course_id, student_id])
+    query = add_where_clause(base_query, constraints)
+
     return db_connection.execute(query, params).fetchall()
 
 def create_grade(db_connection, assignment_id=None, student_id=None, value=None,
@@ -517,7 +567,7 @@ def create_grade(db_connection, assignment_id=None, student_id=None, value=None,
     """
     fields, places, params = make_values_clause(
         ['assignment_id', 'student_id', 'value', 'timestamp'],
-        [course_id, student_id, value, timestamp])
+        [assignment_id, student_id, value, timestamp])
     query = base_query % {'fields': fields, 'places': places}
     db_connection.execute(query, params)
 
@@ -593,22 +643,24 @@ class GradeDict(dict):
         """
         # a single, unique student_id is necessary so that we can
         # correctly enter new grades into the db
-        extra_student_ids = filter(lambda r: r[1] != rows[0][1], rows)
+        extra_student_ids = filter(lambda r: r['student_id'] != rows[0]['student_id'],
+                                   rows)
         if extra_student_ids:
             raise ValueError("student_id must be same in rows: %s" % rows)
         else:
-            self.student_id = rows[0][1]
+            self.student_id = rows[0]['student_id']
 
         # a single, unique course_id is necessary so that we can
         # correctly enter new assignments into the db  
-        extra_course_ids = filter(lambda r: r[2] != rows[0][2], rows)
+        extra_course_ids = filter(lambda r: r['course_id'] != rows[0]['course_id'],
+                                  rows)
         if extra_course_ids:
             raise ValueError("course_id must be same in rows: %s" % rows)
         else:
-            self.course_id = rows[0][2]
+            self.course_id = rows[0]['course_id']
         
         # ensure assignment names are unique in rows
-        assignment_names = [row[4] for row in rows]
+        assignment_names = [row['assignment_name'] for row in rows]
         for i in range(len(assignment_names)):
             if assignment_names[i] in assignment_names[i+1:]:
                 raise ValueError("Assignment names must be unique in rows: %s" %
@@ -617,7 +669,7 @@ class GradeDict(dict):
         # internally, the grades are maintained as a dictionary
         # mapping assignment names to a list of the values needed to
         # store these grades back in the database
-        self._grades = dict([(r[4], list(r)) for r in rows])
+        self._grades = dict([(r['assignment_name'], list(r)) for r in rows])
 
     def __getitem__(self, key):
         return self._grades[key][5]

@@ -61,7 +61,7 @@
    No idea if it works, or how, on Windows or other Unixes.  May need
    to revisit in the future.
 ** DONE [#A] Write docs for initial release!				:doc:
-** TODO [#D] Make compatible with Python 3			  :packaging:
+** TODO [#C] Make compatible with Python 3			  :packaging:
    - actually we are not far off, here
    - 2to3 reveals that pretty much the only changes that need to be made
      are for print statements (<2013-01-19 Sat>)
@@ -91,7 +91,7 @@
      + -g : calculate grades
      + -i : import students
      + -x : export grades
-** TODO [#B] Interface for exporting (sorted) lists of grades	  :ui:export:
+** DONE [#B] Interface for exporting (sorted) lists of grades	  :ui:export:
 ** TODO [#A] Test and fix nested KeyboardInterrupt loop breakout	 :ui:
 ** TODO [#B] Figure out institution setup				 :ui:
    - need an API definition for institution modules
@@ -133,7 +133,7 @@
      broken; also, the extra step here seems totally extraneous
    - calculate_all_grades interface to loop over all current courses
    
-** TODO [#A] Fix grade calculations				  :bug:ui:db:
+** INPROGRESS [#A] Fix grade calculations			  :bug:ui:db:
    - problem 1: if grades are missing, we crash with a KeyError
    - problem 2: if user works around this by trying to use dictionary methods
      on GradeDict, data corruption happens *really easily*
@@ -179,22 +179,12 @@ Something like this?
 #+BEGIN_SRC python
   from schoolutils.grading import calc_helpers as ch
   
-  def calculate_grade_146_fall2013(marshal):
+  def calculate_grade_146_fall2013(rows):
       # simple case: just need co-indexed lists of grade values, weights, etc.
-      vals, weights, types, assignment_names = marshal.unpack_entered_grades()
+      vals, weights, types, assignment_names = ch.unpack_entered_grades(rows)
   
-      # for more complicated cases: marshal provides methods for
-      # accessing different aspects of the raw data
-      # potential methods:
-      # all_assignments()
-      # assignments_with_grade()
-      # all_grades()
-      # grades_for_assignment()
-      # weight_for_grade()
-      # type_for_grade()
-      
       # the actual calculations
-      avg = ch.letter_grade_average(vals, weights=weights)
+      avg = ch.letter_grade_average(vals, weights=weights, missing='F')
       final = ch.points_to_letter(avg)
   
       # simple case: just a name for the calculated field and a value 
@@ -206,16 +196,25 @@ Something like this?
   
       # for more complicated needs: list of dictionaries specifying
       # name, description, type, value
+      # optional: include grade_id as a key to update an existing grade,
+      # or assignment_id to create a new grade for an existing assignment
       return [
           dict(name='Paper average',
                value=avg,
                description='Weighted average of paper grades',
-               type=ch.FOUR_POINT),
+               grade_type=ch.FOUR_POINT),
           dict(name='Final grade',
                value=final,
                description='Raw letter grade',
-               type=ch.LETTER)
+               grade_type=ch.LETTER),
+          # update existing grade
+          dict(grade_id=some_grade_id,
+               value=new_value)
+          # create grade for assignment
+          dict(assignment_id=some_assignment_id,
+               value='F')
           ]
+  
    
 #+END_SRC       
 
@@ -287,6 +286,38 @@ combined, so that e.g. one could run
 	    # ...
 
 ** TODO [#C] Replace db.last_insert_rowid() with native sqlite3 call 	 :db:
+** TODO [#A] Completion message for grade calculation, export		 :ui:
+** TODO [#B] Use itertools.groupby() to save database hits?  :ui:performance:
+   instead of hitting database with a new query for each student, we
+   can do e.g.
+#+BEGIN_SRC python
+  import itertools
+  
+  # get all the grade rows for the whole class
+  all_grades = db.select_grades_for_course_members(db_connection, course_id=course_id)
+  
+  # then loop over them by student
+  for student_id, rows in itertools.groupby(all_grades, lambda r: r['student_id']):
+      # here, rows will be just grades for one student...
+      # this assumes the rows are already grouped by student_id field,
+      # which is presently true but maybe doesn't need to remain so
+** WAITING [#A] Decide how to handle multiple grades for a single assignment :ui:db:
+Problem:
+  1) It seems natural to allow multiple grades for the same student
+     and assignment
+     - can treat database as a log; never destroy old data, just
+       layer on top
+     - some teaching settings might allow this (e.g., revisions?)
+  2) But allowing multiple grades presents some thorny UI problems.
+     Which, if any, is the `right' grade to display/update/export?
+
+For now, *I* only need one grade per assignment per student, so I am
+going to continue assuming this, but code may need to be updated in future.
+
+Affected functions:
+    SimpleUI: edit_grades, export_grades, calculate_grades
+       
+** #+END_SRC
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so
