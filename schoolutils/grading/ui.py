@@ -812,7 +812,7 @@ class SimpleUI(BaseUI):
            current course.
         """
         def save_calculated_grade(student_id,
-                                  name='', # required, unless grade_id is given
+                                  name='', # required, unless grade_id or assignment_id given
                                   value='', # required
                                   # to update an existing grade:
                                   grade_id=None,
@@ -852,10 +852,20 @@ class SimpleUI(BaseUI):
                         weight=weight)
                 # MultipleRecordsFound should propagate
                 
+            # avoid storing calculated grades multiple times
+            try:
+                grade_id = db.ensure_unique(
+                    db.select_grades(self.db_connection,
+                                     student_id=student_id,
+                                     assignment_id=assignment_id))
+            except db.NoRecordsFound:
+                grade_id = None
+                                            
             row_id = db.create_or_update_grade(
                 self.db_connection,
                 student_id=student_id,
                 assignment_id=assignment_id,
+                grade_id=grade_id,
                 value=value)
 
             return row_id
