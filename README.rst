@@ -126,13 +126,11 @@ Grade calculation function
 
     calculate_grade_12A_fall2013
 
-  Each grade calculation function will receive a dictionary as input,
-  representing a single student's (entered) grades in the current
-  course.  The keys of the input dictionary are assignment names; the
-  values are grade values.  The function should return a dictionary
-  with the same keys and values for the entered grades, as well as a
-  new key and value for each calculated grade.  For more information,
-  see the example ``calculators.py`` module.
+  Each grade calculation function will receive a set of database rows
+  as input, representing a single student's grades in the current
+  course.  The function should return a dictionary or list of
+  dictionaries representing grades calculated for that student.  For
+  more information, see the example ``calculators.py`` module.
 
 Validator function
    A validator function is a function you define in your
