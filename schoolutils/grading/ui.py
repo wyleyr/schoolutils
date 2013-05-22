@@ -1112,8 +1112,8 @@ class SimpleUI(BaseUI):
     def edit_student_dict(self, from_dict=None, from_row=None):
         """Convenience wrapper for edit_dict for student data.
            from_row, if provided, should be a row from the students table,
-             formatted like:
-             (student_id, last_name, first_name, sid, email)
+             with at least the following columns: 
+             id, last_name, first_name, sid, email
            from_dict, if provided, should have keys:
              last_name, first_name, sid, email
            You may not pass both from_row and from_dict; but you may pass
@@ -1129,9 +1129,10 @@ class SimpleUI(BaseUI):
         vlds = {'last_name': validators.name, 'first_name': validators.name,
                 'sid': validators.sid, 'email': validators.email}
         d = {}
-        for i, f in enumerate(db_fields):
+        for f in db_fields:
             if from_row:
-                d[f] = from_row[i]
+                # student_id field comes from db as 'id' column
+                d[f] = from_row[f if f != 'student_id' else 'id']
             elif from_dict:
                 d[f] = from_dict.get(f, None)
             else:
