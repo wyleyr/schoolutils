@@ -107,6 +107,15 @@ def four_point_grade(s):
     return float_in_range(s, 0.0, 5.0)
 
 @user_override
+def points_grade(s):
+    """Convert s to a point value grade.
+
+       By default, this function accepts any string convertable to a
+       float() value, with no bounds restrictions.
+    """
+    return float(s)
+
+@user_override
 def letter_grade(s):
     """Ensure s is a letter grade.
 
@@ -201,16 +210,25 @@ def validator_for_grade_type(gt):
          'letter': validators.letter_grade
          '4points': validators.four_point_grade
          'percentage': validators.percentage_grade
-         'points': int
-         any other type: str 
+         'points': validators.points_grade
+       (Note that these functions are possibly overridden by the
+        user's validators.py)
+         
+       If gt does not match any of these keys, a validator named
+         gt.lower() + '_grade' will be sought in the user's
+         validators.py.  For example, if gt is 'foo', the validator
+         user_validators.foo_grade will be returned.
+ 
+       If no such function is found, str() is returned as the default.
     """
     type_map = {
         'letter': letter_grade,
         '4points': four_point_grade,
         'percentage': percentage_grade,
-        'points': int
+        'points': points_grade,
     }
     try:
         return type_map[gt]
     except KeyError:
-        return str
+        f_name = str(gt).lower() + '_grade'
+        return getattr(user_validators, f_name, str)

@@ -55,6 +55,7 @@ def sid(s):
 # grade_weight
 # percentage_grade
 # four_point_grade
+# points_grade
 # letter_grade
 # semester
 # sid
