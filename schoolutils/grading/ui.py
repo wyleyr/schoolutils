@@ -67,7 +67,6 @@ class BaseUI(object):
         self.current_courses = []
         self.course_id = None
         self.assignment_id = None
-        self.student_id = None
 
         self.initial_database_setup()
         self.initial_course_setup()
@@ -185,7 +184,6 @@ class SimpleUI(BaseUI):
             # these fields will now be invalid, so erase them too:
             self.course_id = None
             self.assignment_id = None
-            self.student_id = None
 
             
     def change_database(self):
@@ -214,7 +212,7 @@ class SimpleUI(BaseUI):
         """Lookup a student in the database, trying several methods.
            If create is True, allow (and offer) creating a new student using
              entered criteria if none exists.
-           Returns student row and sets self.student_id.
+           Returns student row. 
         """
         student = None
         first_name = ''
@@ -313,7 +311,6 @@ class SimpleUI(BaseUI):
             return self.get_student(create=create)
 
         print "Selected: %s" % self.student_formatter(student)
-        self.student_id = student['id']
         return student
 
     # Top-level actions:       
@@ -666,43 +663,44 @@ class SimpleUI(BaseUI):
         """Add or edit students.
            Lookup students and modify their contact data and course memberships.
         """
-        student = self.get_student(create=True)
-            
         self.actions_menu(
             "What do you want to do?",
-            [self.edit_student_info, self.edit_student_courses])
-            
+            [self.edit_student_info,
+             self.edit_student_courses,
+             self.edit_course_members])
  
     @require('db_connection', change_database,
              "A database connection is required to edit student information.")
-    @require('student_id', get_student,
-             "A selected student is required to edit student information.")
     def edit_student_info(self):
         """Edit student contact data.
-           Change name, SID, email, etc. for current student.
+           Change name, SID, email, etc. for a single student.
         """
-        student = db.select_students(self.db_connection,
-                                     student_id=self.student_id)[0]
-        d = self.edit_student_dict(from_row=student)
+        # ugly hack: check result of get_student against list of existing students
+        # to avoid asking user to enter student data 3(!) times (to search, create, edit)
+        all_student_ids = [s['id'] for s in db.select_students(self.db_connection)]
+        student = self.get_student(create=True)
+        if student['id'] in all_student_ids:
+            # this was an existing student, so run the editor:
+            d = self.edit_student_dict(from_row=student)
+            student_id = db.create_or_update_student(self.db_connection, **d)
+        else:
+            # this student was just created, so skip the editor;
+            # get_student already gave user a chance to confirm data
+            pass
         
-        self.student_id = db.create_or_update_student(self.db_connection, **d)
         print "Student information updated."
 
     @require('db_connection', change_database,
              "A database connection is required to edit course memberships.")
-    @require('student_id', get_student,
-             "A selected student is required to edit course memberships.")
     def edit_student_courses(self):
         """Edit student courses.
-           Add or remove current student from courses.
+           Add or remove a single student from one or more courses.
         """
-        student = db.select_students(self.db_connection,
-                                     student_id=self.student_id)[0]
-        
+        student = self.get_student()
         def add_to_course():
             all_courses = db.select_courses(self.db_connection)
             current_courses = db.select_courses(self.db_connection,
-                                                student_id=self.student_id)
+                                                student_id=student['id'])
             options = filter(lambda c: c not in current_courses, all_courses)
             course = self.options_menu(
                 "Which course should the student be added to?",
@@ -712,7 +710,7 @@ class SimpleUI(BaseUI):
             if course:
                 course_id = course['id']
                 db.create_course_member(self.db_connection,
-                                        student_id=self.student_id,
+                                        student_id=student['id'],
                                         course_id=course_id)
                 print "Student added to %s" % self.course_formatter(course)
             else:
@@ -723,12 +721,12 @@ class SimpleUI(BaseUI):
         def remove_from_course(course):
             course_id = course['id']
             db.delete_course_member(self.db_connection,
-                                    student_id=self.student_id,
+                                    student_id=student['id'],
                                     course_id=course_id)
             print "Student deleted from %s" % self.course_formatter(course)
 
         current_courses = db.select_courses(self.db_connection,
-                                            student_id=self.student_id)
+                                            student_id=student['id'])
         self.edit_table(
             current_courses,
             "Current courses for %s" % self.student_formatter(student),
@@ -1156,15 +1154,6 @@ class SimpleUI(BaseUI):
             print "Current assignment is: %s" % self.assignment_formatter(assignment)
         else:
             print "No assignment selected"
-
-    def print_student_info(self):
-        "Prints information about the currently select student"
-        if self.student_id:
-            student = db.select_students(self.db_connection,
-                                         student_id=self.student_id)[0]
-            print "Current student is: %s" % self.student_formatter(student)
-        else:
-            print "No student selected"
 
     def print_db_info(self):
          "Prints information about the database connection"
