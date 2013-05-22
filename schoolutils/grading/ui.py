@@ -736,7 +736,35 @@ class SimpleUI(BaseUI):
 
         print "Student course memberships updated."
         
+    @require('db_connection', change_database,
+             "A database connection is required to edit students in course.")
+    @require('course_id', change_course,
+             "A selected course is required to edit students in course.")
+    def edit_course_members(self):
+        """Edit course enrollments.
+           Add or remove one or more students in the current course.
+        """
+        def remove_from_course(student):
+            student_id = student[0]
+            db.delete_course_member(self.db_connection,
+                                    student_id=student_id,
+                                    course_id=self.course_id)
+            print ("Deleted student %s from course." %
+                   self.student_formatter(student))
 
+        current_students = db.select_students(self.db_connection,
+                                              course_id=self.course_id)
+        current_course = db.select_courses(self.db_connection,
+                                           course_id=self.course_id)[0]
+        self.edit_table(
+            current_students,
+            "Current students in %s" % self.course_formatter(current_course),
+            self.student_formatter,
+            # TODO: allow escape from get_student
+            creator=lambda: self.get_student(create=True),
+            deleter=remove_from_course)
+        print "Course enrollments updated."
+ 
     def import_grades(self):
         pass
 
@@ -868,7 +896,6 @@ class SimpleUI(BaseUI):
                 value=value)
 
             return row_id
- 
         
                                   
         course = db.select_courses(self.db_connection,
