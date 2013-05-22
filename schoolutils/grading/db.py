@@ -258,6 +258,7 @@ def select_students(db_connection, student_id=None, year=None, semester=None,
         ON (course_memberships.student_id=students.id AND
             course_memberships.course_id=courses.id)
         %(where)s
+        ORDER BY students.last_name ASC, students.first_name ASC
         """
     else:
         # don't perform a join without any course information to constrain the query:
@@ -267,6 +268,7 @@ def select_students(db_connection, student_id=None, year=None, semester=None,
                students.sid, students.email
         FROM students
         %(where)s
+        ORDER BY students.last_name ASC, students.first_name ASC
         """
 
     exact_fields = ['courses.year', 'courses.semester', 'courses.id',
