@@ -21,10 +21,11 @@ User interfaces for grading utilities.
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 # 02110-1301, USA.
 
-import os, sys, csv, datetime
+import os, sys, csv, datetime, tempfile
 
 from schoolutils.config import user_config, user_calculators
 from schoolutils.grading import db, validators
+from schoolutils.reporting import reports
 
 # TODO: abstract from specific institution
 from schoolutils.institutions.ucberkeley import bspace
@@ -333,6 +334,7 @@ class SimpleUI(BaseUI):
                  self.calculate_grades,
                  #self.import_grades,
                  self.export_grades,
+                 self.grade_report,
                  self.exit])
 
             # commit after successful completion of any top-level action
@@ -939,7 +941,28 @@ class SimpleUI(BaseUI):
                 save_calculated_grade(s['id'], **cg)
 
         print "Grade calculations ran successfully.\n"
+
+    @require('db_connection', change_database,
+             "A database connection is required to view a grade report.")
+    @require('course_id', change_course,
+             "A selected course is required to view a grade report.")
+    def grade_report(self):
+        """View grade report.
+           See a report on grades in the current course."""
+        r = reports.GradeReport(self.db_connection, course_id=self.course_id)
+        r.run()
+        print r.as_text(compact=True)
+        if typed_input("See and save the full report? (Y/N): ", yn_bool):
+            # TODO: support for pager program?
+            full_report = r.as_text(compact=False)
+            print full_report
             
+            course = db.select_courses(self.db_connection,
+                                       course_id=self.course_id)[0]
+            name = "grade_report_{number}_{semester}_{year}-".format(**course)
+            with tempfile.NamedTemporaryFile(prefix=name) as t:
+                t.write(full_report)
+                print "Full report saved at: %s\n" % t.name
 
     def exit(self):
         """Quit grader.
