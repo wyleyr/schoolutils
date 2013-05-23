@@ -143,7 +143,7 @@ def weighted_average(values, weights, filter_nan=False):
        the resulting values."""
     if filter_nan:
         values = remove_none_and_nan(values)
-    return sum([n[0] * n[1] for n in zip(grades, weights)])
+    return sum([n[0] * n[1] for n in zip(values, weights)])
 
 def points_to_weights(point_values):
     """Convert a list of point values to a list of fractional weights.
