@@ -21,7 +21,7 @@ Basic report definitions.
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 # 02110-1301, USA.
 
-import cStringIO
+import math, cStringIO
 
 from schoolutils.grading import db, calculator_helpers as ch
 
@@ -48,6 +48,7 @@ class GradeReport(Report):
         self.db_connection = db_connection
 
     def run(self):
+        "Run the calculations for this report"
         assignments = db.select_assignments(
             self.db_connection,
             course_id=self.course_id)
@@ -61,34 +62,94 @@ class GradeReport(Report):
             grades = filter(lambda g: g['assignment_id'] == a['id'],
                             all_grades)
             missing = [g['student_id'] for g in grades if g['grade_id'] is None]
-            mn, mx, avg = self.calculate_stats(grades)
-            stats.append({
-                    'assignment_id': a['id'],
-                    'assignment_name': a['name'],
-                    'min': mn,
-                    'max': mx,
-                    'mean': avg,
-                    'missing_students': missing,
-                    })
+            try:
+                mn, mx, avg = self.calculate_stats(grades)
+                stats.append({
+                        'assignment_id': a['id'],
+                        'assignment_name': a['name'],
+                        'min': mn,
+                        'max': mx,
+                        'mean': avg,
+                        'missing_students': missing,
+                        })
+            except ValueError as e:
+                # no stats available here, e.g., because no grade_type
+                stats.append({
+                        'assignment_id': a['id'],
+                        'assignment_name': a['name'],
+                        'unavailable': str(e),
+                        'missing_students': missing,
+                        })
 
         self.stats = stats
         return stats
 
-    def calculate_stats(self, grades): 
+    def calculate_stats(self, grades):
+        "Calculate summary statistics for the grades for a particular assignment"
         values, weights, types, _ = ch.unpack_entered_grades(grades)
         grade_type = types[0]
         mn = ch.min_for_type(values, grade_type)
         mx = ch.max_for_type(values, grade_type)
         avg = ch.mean_for_type(values, grade_type)
         if grade_type == 'letter':
-            avg = ch.points_to_letter(avg) # letter grade is more useful here
+            if math.isnan(avg):
+                avg = None
+            else:
+                # letter grade is more useful here
+                avg = ch.points_to_letter(avg)
        
         return mn, mx, avg
 
-    def as_text(self):
+    def as_text(self, compact=False):
+        """Return a textual representation of this report as a string.
+           If compact is True, returns a compact, tabular representation.
+           If compact is False, returns a full report, including names
+           of students who are missing grades for each assignment."""
+        if compact:
+            return self.as_compact_text()
+        else:
+            return self.as_full_text()
+
+    def as_compact_text(self):
+        "Return a compact, tabular representation of this report."
         title_template = "GRADE REPORT: {number}: {name}, {semester} {year}\n"
-        stats_template = "{assignment_name: <25s} Average: {mean: <8} Minimum: {min: <8}  Maximum: {max: <8}\n"
-        missing_template = "{num_missing} students do not have a grade for this assignment:\n{student_names}"
+        row_template = ("{assignment_name: <25} {mean: <10} {min: <10}"
+                        "{max: <10} {num_missing: <15}\n")
+        header = row_template.format(assignment_name="Assignment", mean="Average",
+                                     min="Minimum", max="Maximum",
+                                     num_missing="Missing grades")
+        underline = "".join('-' for i in range(len(header))) + "\n"
+        
+        output = cStringIO.StringIO()
+
+        course = db.select_courses(self.db_connection, course_id=self.course_id)[0]
+        output.write(title_template.format(**course))
+        output.write(header)
+        output.write(underline)
+
+        for s in self.stats:
+            num_missing = len(s['missing_students'])
+            if 'unavailable' in s:
+                output.write(row_template.format(
+                        assignment_name=s['assignment_name'],
+                        min=None, max=None, mean=None,
+                        num_missing=num_missing))
+                continue
+            
+            output.write(row_template.format(num_missing=num_missing, **s))
+            
+        return output.getvalue()
+       
+    def as_full_text(self):
+        """Return a full representation of this report.
+           Includes names of students missing a grade for each assignment."""
+        title_template = "GRADE REPORT: {number}: {name}, {semester} {year}\n"
+        stats_template = ("{assignment_name: <25s}\nAverage: {mean: <8} "
+                          "Minimum: {min: <8}  Maximum: {max: <8}\n")
+        no_stats_msg = ("{assignment_name: <25s}\n  No statistics available for "
+                        "this assignment, because:\n  {unavailable}\n")
+        missing_template = ("{num_missing} students do not have a grade for this "
+                            "assignment:\n{student_names}\n")
         name_template = "{last_name}, {first_name} (SID: {sid})"
         
         output = cStringIO.StringIO()
@@ -97,6 +158,10 @@ class GradeReport(Report):
         output.write(title_template.format(**course))
 
         for s in self.stats:
+            if 'unavailable' in s:
+                output.write(no_stats_msg.format(**s))
+                continue
+                        
             output.write(stats_template.format(**s))
             if s['missing_students']:
                 students = db.select_students(self.db_connection,
@@ -104,8 +169,11 @@ class GradeReport(Report):
                 names = "\n".join(name_template.format(**stu)
                                   for stu in students
                                   if stu['id'] in s['missing_students'])
-                output.write(missing_template.format(num_missing=len(s['missing_students']),
-                                                     student_names=names))
+                output.write(missing_template.format(
+                        num_missing=len(s['missing_students']),
+                        student_names=names))
+
+            output.write('\n') # empty line between assignments
 
         return output.getvalue()
     
