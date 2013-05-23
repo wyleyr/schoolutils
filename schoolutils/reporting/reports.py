@@ -77,21 +77,15 @@ class GradeReport(Report):
         mn = ch.min_for_type(values, grade_type)
         mx = ch.max_for_type(values, grade_type)
         avg = ch.mean_for_type(values, grade_type)
+        if grade_type == 'letter':
+            avg = ch.points_to_letter(avg) # letter grade is more useful here
        
         return mn, mx, avg
 
     def as_text(self):
         title_template = "GRADE REPORT: {number}: {name}, {semester} {year}\n"
-        stats_template = """
-Assignment: {assignment_name}
-Average grade: {mean}
-Minimum grade: {min}
-Maximum grade: {max}
-"""
-        missing_template = """
-{num_missing} students do not have a grade for this assignment:
-{student_names}
-"""
+        stats_template = "{assignment_name: <25s} Average: {mean: <8} Minimum: {min: <8}  Maximum: {max: <8}\n"
+        missing_template = "{num_missing} students do not have a grade for this assignment:\n{student_names}"
         name_template = "{last_name}, {first_name} (SID: {sid})"
         
         output = cStringIO.StringIO()
