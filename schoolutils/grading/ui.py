@@ -770,6 +770,8 @@ class SimpleUI(BaseUI):
     def import_grades(self):
         pass
 
+    @require('db_connection', change_database,
+             "A database connection is required to export grades.")
     @require('course_id', change_course,
              "A selected course is required to export grades.")
     def export_grades(self):
@@ -833,6 +835,8 @@ class SimpleUI(BaseUI):
         out_file.close()
         print "Grades exported successfully to: %s.\n" % out_file_name
                 
+    @require('db_connection', change_database,
+             "A database connection is required to calculate grades.")
     @require('course_id', change_course,
              "A selected course is required to calculate grades.")
     def calculate_grades(self):
