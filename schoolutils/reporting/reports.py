@@ -32,6 +32,9 @@ class Report(object):
     def __init__(self):
         pass
 
+    def run(self):
+        pass
+    
     def as_text(self):
         pass
 
