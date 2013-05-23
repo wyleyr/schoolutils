@@ -364,6 +364,8 @@ Affected functions:
    so we could say things like:
    $ grade -c 146 -s spring -y 2013 --import-students < student_list.txt
    $ grade -c 146 -s spring -y 2013 --calculate-grades --export-grades > grades.csv
+** TODO [#B] Remove broken code from 0.1.5 release	      :bug:packaging:
+   in institutions directory...produces error message during install
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so
