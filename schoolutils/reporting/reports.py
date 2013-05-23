@@ -90,7 +90,7 @@ class GradeReport(Report):
         grade_type = types[0] # values are for single assignment and grade type
         mn = ch.min_for_type(values, grade_type)
         mx = ch.max_for_type(values, grade_type)
-        avg = ch.mean_for_type(values, grade_type)
+        avg = ch.mean_for_type(values, grade_type, filter_nan=True)
         if grade_type == 'letter':
             if math.isnan(avg):
                 avg = None
