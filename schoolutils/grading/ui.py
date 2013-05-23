@@ -964,7 +964,7 @@ class SimpleUI(BaseUI):
             course = db.select_courses(self.db_connection,
                                        course_id=self.course_id)[0]
             name = "grade_report_{number}_{semester}_{year}-".format(**course)
-            with tempfile.NamedTemporaryFile(prefix=name) as t:
+            with tempfile.NamedTemporaryFile(prefix=name, delete=False) as t:
                 t.write(full_report)
                 print "Full report saved at: %s\n" % t.name
 
