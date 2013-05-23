@@ -72,7 +72,7 @@ class GradeReport(Report):
                         'mean': avg,
                         'missing_students': missing,
                         })
-            except ValueError as e:
+            except (ValueError, TypeError) as e:
                 # no stats available here, e.g., because no grade_type
                 stats.append({
                         'assignment_id': a['id'],
@@ -87,7 +87,7 @@ class GradeReport(Report):
     def calculate_stats(self, grades):
         "Calculate summary statistics for the grades for a particular assignment"
         values, weights, types, _ = ch.unpack_entered_grades(grades)
-        grade_type = types[0]
+        grade_type = types[0] # values are for single assignment and grade type
         mn = ch.min_for_type(values, grade_type)
         mx = ch.max_for_type(values, grade_type)
         avg = ch.mean_for_type(values, grade_type)
