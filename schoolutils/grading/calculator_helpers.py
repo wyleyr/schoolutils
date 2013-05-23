@@ -102,6 +102,20 @@ def number_to_letter(n, scale):
                          (n, scale[0][2], scale[-2][3])) 
      
 # Aggregations and averages:   
+def letter_grade_min(letter_grades):
+    """Returns minimum grade in a list of letter grades."""
+    pts = map(letter_to_points, letter_grades)
+    mn = min(pts)
+    i = pts.index(mn)
+    return letter_grades[i]
+
+def letter_grade_max(letter_grades):
+    """Returns maximum grade in a list of letter grades."""
+    pts = map(letter_to_points, letter_grades)
+    mx = max(pts)
+    i = pts.index(mx)
+    return letter_grades[i]
+   
 def letter_grade_average(letter_grades, weights=None):
     """4.0-scale average of grades in letter_grades.
        If given, weights[i] should be a weight for the letter grade in
@@ -130,6 +144,44 @@ def points_to_weights(point_values):
        represents of the sum of point_values."""
     s = sum(point_values)
     return [float(p)/s for p in point_values]
+
+def calculation_for_type(grades, grade_type, numeric_func,
+                         letter_func=None, scale=POINTS):
+    """Calculate a statistic on grades, dispatching on grade_type.
+       numeric_func should be the function to call if grade_type is
+         a numeric grade type, i.e., 'points', '4points', or 'percentage'
+       letter_func should be a the function to call if grade_type is
+         a letter grade type, i.e., 'letter'
+         If not provided, letter grades will first be converted using
+         scale, then numeric_func will be applied to the converted values. 
+       Return the calculated value, or raises ValueError if grade_type
+         is not known.
+    """
+    if grade_type in ['points', '4points', 'percentage']:
+        return numeric_func(grades)
+    elif grade_type == 'letter':
+        if letter_func:
+            return letter_func(grades)
+        else:
+            conversion = lambda g: letter_to_number(g, scale)
+            return numeric_func(map(conversion, grades))
+    else:
+        raise ValueError("Unknown grade type: %s" % grade_type)
+       
+def min_for_type(values, grade_type):
+    "Returns minimum value in a list of grades."
+    return calculation_for_type(values, grade_type, min,
+                                letter_func=letter_grade_min)
+
+def max_for_type(values, grade_type):
+    "Returns maximum value in a list of grades."
+    return calculation_for_type(values, grade_type, max,
+                                letter_func=letter_grade_max)
+
+def mean_for_type(values, grade_type):
+    "Returns unweighted average (mean) value in a list of grades."
+    return calculation_for_type(values, grade_type, unweighted_average,
+                                letter_func=letter_grade_average)
 
 # Munging input data:
 def unpack_entered_grades(rows):
