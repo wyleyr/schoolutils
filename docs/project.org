@@ -117,11 +117,11 @@ It would be nice for reporting to be this easy:
           return user_validators.sid(s)
        else:
           # ...
-** INPROGRESS [#A] Interfaces to edit existing assignments, courses, grades :ui:edit:
+** DONE [#A] Interfaces to edit existing assignments, courses, grades :ui:edit:
    - need to be able to modify and delete these
    - [X] edit_grades
-   - [ ] edit_courses
-   - [ ] edit_assignments
+   - [X] edit_courses
+   - [X] edit_assignments
      
 ** DONE [#A] Make executable scripts with CLI options		     :ui:bin:
    - bin/grade: start the grader
@@ -371,6 +371,16 @@ Observed problems:
 1) student doesn't end up in course when added via edit_course_members!
 2) "Deletion unsuccessful" when deleting existing student.
 
+** TODO [#C] Don't require 's' prefix to make selection in edit_table?	 :ui:
+   Since edit_table is now being used to select current course and
+   assignment, one can reflexively enter the row number to select a
+   row, but that ends up editing the row rather than selecting it,
+   which is not usually what you want.
+   Options:
+   1) always require explicit prefix? ('e' to edit, etc.)
+   2) when selector is present, use different prefixes, allow
+      selection by number?
+            
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so
