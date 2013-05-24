@@ -239,6 +239,49 @@ def create_assignment(db_connection, course_id=None, name=None, description=None
 
     return last_insert_rowid(db_connection)
   
+def create_or_update_assignment(db_connection, assignment_id=None,
+                                course_id=None, name=None, description=None,
+                                due_date=None, grade_type=None, weight=None):
+    """Create a new assignment or update a record of an existing assignment.
+       Returns the id of the created or updated row.
+
+       WARNING: This function uses SQLite's INSERT OR REPLACE
+       statement rather than an UPDATE statement.  If you pass
+       assignment_id, it *will* erase data in an existing row of the
+       assignments table on a conflict; you must provide all values to
+       replace the existing data.
+    """
+    base_query = """
+    INSERT OR REPLACE INTO assignments (%(fields)s) VALUES (%(places)s);
+    """
+    fields, places, params = make_values_clause(
+        ['id', 'course_id', 'name', 'description', 'due_date',
+         'grade_type', 'weight'],
+        [assignment_id, course_id, name, description, due_date,
+         grade_type, weight])
+    
+    query = base_query % {'fields': fields, 'places': places}
+    db_connection.execute(query, params)
+    
+    return last_insert_rowid(db_connection)
+
+def delete_assignment_and_grades(db_connection, assignment_id=None):
+    """Delete an assignment and all associated grades.
+       assignment_id is required; this function will not delete more than
+       one assignment.
+       Returns number of deleted rows.
+    """
+    if not assignment_id:
+        raise ValueError("assignment_id is required to delete assignment row.")
+    
+    query1 = "DELETE FROM grades WHERE assignment_id=?;"
+    query2 = "DELETE FROM assignments WHERE id=?;"
+    params = (assignment_id,)
+    db_connection.execute(query1, params)
+    db_connection.execute(query2, params)
+
+    return num_changes(db_connection)
+
 def select_students(db_connection, student_id=None, year=None, semester=None,
                     course_id=None, course_name=None, last_name=None,
                     first_name=None, sid=None, email=None,
