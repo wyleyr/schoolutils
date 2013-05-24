@@ -22,7 +22,7 @@
 ** TODO [#B] Interfaces to reporting functions		       :ui:reporting:
 ** TODO [#D] More sophisticated UI? Curses-based? 			 :ui:
 ** TODO [#C] Separation of 'view' and 'controller' UI code		 :ui:
-** TODO [#B] Summary statistics					  :reporting:
+** INPROGRESS [#B] Summary statistics				  :reporting:
 *** Grade reports for current course
 It would be nice to:
   - see averages (mean, median...) by assignment
