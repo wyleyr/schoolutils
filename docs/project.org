@@ -366,6 +366,11 @@ Affected functions:
    $ grade -c 146 -s spring -y 2013 --calculate-grades --export-grades > grades.csv
 ** TODO [#B] Remove broken code from 0.1.5 release	      :bug:packaging:
    in institutions directory...produces error message during install
+** DONE [#A] Adding student to course doesn't work		     :bug:ui:
+Observed problems:
+1) student doesn't end up in course when added via edit_course_members!
+2) "Deletion unsuccessful" when deleting existing student.
+
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so

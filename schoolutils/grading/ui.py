@@ -869,13 +869,23 @@ class SimpleUI(BaseUI):
         """Edit course enrollments.
            Add or remove one or more students in the current course.
         """
+        def add_to_course():
+            student = self.get_student(create=True)
+            db.create_course_member(self.db_connection,
+                                    student_id=student['id'],
+                                    course_id=self.course_id)
+            print ("Added %s to course." %
+                   self.student_formatter(student))
+            return student
+            
         def remove_from_course(student):
-            student_id = student[0]
+            student_id = student['id']
             db.delete_course_member(self.db_connection,
                                     student_id=student_id,
                                     course_id=self.course_id)
             print ("Deleted student %s from course." %
                    self.student_formatter(student))
+            return True
 
         current_students = db.select_students(self.db_connection,
                                               course_id=self.course_id)
@@ -885,8 +895,7 @@ class SimpleUI(BaseUI):
             current_students,
             "Current students in %s" % self.course_formatter(current_course),
             self.student_formatter,
-            # TODO: allow escape from get_student
-            creator=lambda: self.get_student(create=True),
+            creator=add_to_course,
             deleter=remove_from_course)
         print "Course enrollments updated."
  
