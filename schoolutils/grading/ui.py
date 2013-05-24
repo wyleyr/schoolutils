@@ -326,6 +326,7 @@ class SimpleUI(BaseUI):
                 "Main menu.",
                 [self.change_database,
                  self.change_course,
+                 self.edit_courses,
                  self.edit_assignments,
                  self.import_students,
                  self.edit_student,
@@ -409,6 +410,95 @@ class SimpleUI(BaseUI):
             name=course_name, number=course_num)
 
         self.course_id = course_id
+
+    @require('db_connection', change_database,
+             "A database connection is required to edit assignments.")
+    def edit_courses(self):
+        """Edit courses.
+           Select, create, edit and delete courses."""
+        def edit_course(c):
+            make_default_clause = lambda v: (" (default: %s)" % str(v)
+                                             if v else '')
+            name_prompt = "Enter course name{default}: ".format(
+                default=make_default_clause(c['name']))
+            course_name = typed_input(name_prompt, validators.course_name,
+                                      default=c['name'])
+            year_prompt = "Enter year{default}: ".format(
+                default=make_default_clause(c['year']))
+            year = typed_input(year_prompt, validators.year, default=c['year'])
+            sem_prompt = "Enter semester{default}: ".format(
+                default=make_default_clause(c['semester']))
+            semester = typed_input(sem_prompt, validators.semester,
+                                   default=c['semester'])
+            num_prompt = "Enter course number{default}: ".format(
+                default=make_default_clause(c['number']))
+            course_num = typed_input(num_prompt, validators.course_number,
+                                     default=c['number'])
+            
+            course_id = db.create_or_update_course(
+                self.db_connection,
+                course_id=c['id'],
+                year=year,
+                semester=semester,
+                name=course_name,
+                number=course_num)
+
+            return db.select_courses(self.db_connection, course_id=course_id)[0]
+        
+        create_course = lambda: edit_course({
+                'id': None,
+                'name': None,
+                'year': None,
+                'semester': None,
+                'number': None,
+                })
+                
+        def delete_course(c):
+            existing_assignments = db.select_assignments(self.db_connection,
+                                                         course_id=c['id'])
+            existing_grades = filter(lambda g: g['value'] is not None,
+                                     db.select_grades_for_course_members(
+                                       self.db_connection,
+                                       course_id=c['id']))
+            enrollees = db.select_students(self.db_connection, course_id=c['id'])
+            if existing_assignments:
+                print ("WARNING: there are %d existing assignments for this course, "
+                       "with %d associated grades.\n"
+                       "Deleting this course will DELETE THESE ASSIGNMENTS AND GRADES, "
+                       "and UNENROLL %d STUDENTS." %
+                       (len(existing_assignments), len(existing_grades), len(enrollees)))
+                if not typed_input("Delete anyway? (Y/N) ", yn_bool):
+                    return False
+
+            # deselect if this assignment was the currently selected assignment
+            if self.course_id == c['id']:
+                self.course_id = None
+                
+            return db.delete_course_etc(self.db_connection,
+                                        course_id=c['id'])
+
+        def select_course(c):
+            self.course_id = c['id']
+            print ("Selected course %s as current course.\n"
+                   % self.course_formatter(c))
+            return True
+        
+#        format_str = ("{name: <20s} {due_date: <10s} {grade_type: <7s} {weight: <6} "
+#                      "{description: <32s}")
+#        formatter = lambda r: format_str.format(**r)
+        formatter = self.course_formatter
+        # header = format_str.format(name="Name", due_date="Due date",
+        #                            grade_type="Type", weight="Weight",
+        #                            description="Description")
+        header = "Courses"
+        courses = db.select_courses(self.db_connection)
+        
+        self.edit_table(courses, header, formatter,
+                        editor=edit_course,
+                        creator=create_course,
+                        deleter=delete_course,
+                        selector=select_course)
+ 
 
     @require('db_connection', change_database,
              "A database connection is required to edit assignments.")
