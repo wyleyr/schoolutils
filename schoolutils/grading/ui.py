@@ -635,7 +635,7 @@ class SimpleUI(BaseUI):
                             'email': "Email", 'sid': "SID"})
         students = self.edit_table(students, header, formatter,
                                    editor=editor, creator=creator,
-                                   deleter=lambda s: None)
+                                   deleter=lambda s: True)
 
         for s in students:
             try:
@@ -726,6 +726,7 @@ class SimpleUI(BaseUI):
                                     student_id=student['id'],
                                     course_id=course_id)
             print "Student deleted from %s" % self.course_formatter(course)
+            return True
 
         current_courses = db.select_courses(self.db_connection,
                                             student_id=student['id'])
@@ -1060,7 +1061,7 @@ class SimpleUI(BaseUI):
             return None
 
     def edit_table(self, rows, header, formatter, editor=None,
-                   creator=None, deleter=None):
+                   creator=None, deleter=None, selector=None):
         """Present a simple interface for reviewing and editing tabular data.
            rows should be a sequence of values for the user to review and edit
            header should be a string to print above the table
@@ -1071,7 +1072,14 @@ class SimpleUI(BaseUI):
            creator, if provided, should be a function with no arguments which
              returns a new row value based on user input  
            deleter, if provided, should be a function to call for its side
-             effects with the row value when the user deletes a row
+             effects with the row value when the user deletes a row.
+             It should return False if deletion was aborted or unsuccessful,
+             and a true value otherwise.
+           selector, if provided, should be a function to call for its side
+             effects with the row value when the user selects a row to be the
+             currently-selected value (e.g., current assignment or course).
+             It should return True if this function should exit after a selection
+             is made, False otherwise.
            Returns the edited rows.
         """
         editable_rows = [r for r in rows]
@@ -1082,8 +1090,11 @@ class SimpleUI(BaseUI):
             if s.startswith('d'):
                 action = 'd'
                 idx = validators.int_in_range(s[1:], 0, len(editable_rows)+1)
-            elif s.startswith('i'):
-                action = 'i'
+            elif s.startswith('s'):
+                action = 's'
+                idx = validators.int_in_range(s[1:], 0, len(editable_rows)+1)
+            elif s.startswith('c'):
+                action = 'c'
                 idx = None
             else:
                 action = 'e'
@@ -1102,9 +1113,11 @@ class SimpleUI(BaseUI):
                 if editor:
                     prompt += "Enter row # to edit. " 
                 if creator:
-                    prompt += "Enter 'i' to insert a new row. "
+                    prompt += "Enter 'c' to create a new row. "
                 if deleter:
                     prompt += "Prefix row # with 'd' to delete. "
+                if selector:
+                    prompt += "\nTo make a selection, prefix row # with 's'. "
                 prompt += "\nWhat do you want to do? "
                     
                 action, idx = typed_input(prompt, validator)
@@ -1112,15 +1125,21 @@ class SimpleUI(BaseUI):
                     new_row = editor(editable_rows[idx])
                     if new_row: # editor might return None
                         editable_rows[idx] = new_row
-                elif action == 'd':
-                    to_delete = editable_rows.pop(idx)
-                    if deleter:
-                        deleter(to_delete)
-                elif action == 'i' and creator: 
+                elif action == 'd' and deleter:
+                    success = deleter(editable_rows[idx])
+                    if success:
+                        editable_rows.pop(idx)
+                    else:
+                        print "Deletion unsuccessful."
+                elif action == 'c' and creator: 
                     new_row = creator()
                     if new_row: # creator might return None
                         editable_rows.append(new_row)
-
+                elif action == 's' and selector:
+                    should_exit = selector(editable_rows[idx])
+                    if should_exit:
+                        return editable_rows
+                    
             except KeyboardInterrupt:
                 print ""
                 break
