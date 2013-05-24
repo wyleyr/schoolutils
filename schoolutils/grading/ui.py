@@ -326,7 +326,6 @@ class SimpleUI(BaseUI):
                 "Main menu.",
                 [self.change_database,
                  self.change_course,
-                 self.change_assignment,
                  self.edit_assignments,
                  self.import_students,
                  self.edit_student,
@@ -410,69 +409,6 @@ class SimpleUI(BaseUI):
             name=course_name, number=course_num)
 
         self.course_id = course_id
-
-        
-    @require('db_connection', change_database,
-             "A database connection is required to change the current assignment.")
-    def change_assignment(self):
-        """Change current assignment.
-           Select an existing assignment from the database, or add a new one.
-        """
-        self.print_assignment_info()
-        self.actions_menu("What do you want to do?",
-            [self.select_assignment, self.create_assignment])
-
-        
-    @require('db_connection', change_database,
-             "A database connection is required to select an assignment.")
-    @require('course_id', change_course,
-             "A selected course is required to select an assignment.")
-    def select_assignment(self):
-        """Select an assignment.
-           Lookup an existing assignment in the database.
-        """
-        assignments = db.select_assignments(self.db_connection,
-                                            course_id=self.course_id)
-        if len(assignments) == 0:
-            create = typed_input(
-                "No assignments found for the current course.  Create? (Y/N) ",
-                yn_bool)
-            if create:
-                return self.create_assignment()
-            else:
-                print "No assignment selected or created."
-        else:
-            assignment = self.options_menu(
-                "Select an assignment for this course:",
-                assignments, self.assignment_formatter,
-                escape=self.create_assignment, allow_none=True)
-            if assignment:
-                self.assignment_id = assignment['id']
-                
-            
-    @require('db_connection', change_database,
-             "A database connection is required to create an assignment.")
-    @require('course_id', change_course,
-             "A selected course is required to create an assignment.")
-    def create_assignment(self):
-        """Create a new assignment.
-           Add a new assignment to the database and select it as the current assignment.
-        """
-        name = typed_input("Enter assignment name: ", validators.assignment_name)
-        description = typed_input("Enter description: ", str, default='')
-        due_date = typed_input("Enter due date (YYYY-MM-DD): ", validators.date)
-        grade_type = typed_input("Enter grade type: ", validators.grade_type)
-        if grade_type == "points":
-            weight_prompt = "Enter number of possible points: "
-        else:
-            weight_prompt = "Enter grade weight (as decimal fraction of 1): "
-        weight = typed_input(weight_prompt, validators.grade_weight)
-
-        self.assignment_id = db.create_assignment(
-            self.db_connection,
-            course_id=self.course_id,
-            name=name, description=description, grade_type=grade_type,
-            due_date=due_date, weight=weight)
 
     @require('db_connection', change_database,
              "A database connection is required to edit assignments.")
@@ -574,7 +510,7 @@ class SimpleUI(BaseUI):
              "A database connection is required to enter grades.")
     @require('course_id', change_course,
              "A selected course is required to enter grades.")
-    @require('assignment_id', change_assignment,
+    @require('assignment_id', edit_assignments,
              "A selected assignment is required to enter grades.")
     def enter_grades(self):
         """Enter grades.
