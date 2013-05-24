@@ -325,7 +325,6 @@ class SimpleUI(BaseUI):
             self.actions_menu(
                 "Main menu.",
                 [self.change_database,
-                 self.change_course,
                  self.edit_courses,
                  self.edit_assignments,
                  self.import_students,
@@ -343,19 +342,6 @@ class SimpleUI(BaseUI):
             self.db_connection.commit()
 
            
-    @require('db_connection', change_database,
-             "A database connection is required to change the current course.")
-    def change_course(self):
-        """Change current course.
-           Select an existing course from the database, or add a new one.
-        """
-        # TODO: add support for selecting from user_config.current_courses
-        self.print_course_info()
-        self.actions_menu("What do you want to do?",
-                        [self.select_course,
-                         self.create_course])
-
-        
     @require('db_connection', change_database,
              "A database connection is required to select a course.")
     def select_course(self):
@@ -389,30 +375,8 @@ class SimpleUI(BaseUI):
                 print "Selected: %s" % self.course_formatter(course)
                 self.course_id = course['id']
 
-                
     @require('db_connection', change_database,
-             "A database connection is required to create a course")
-    def create_course(self):
-        """Create a new course.
-           Add a new course to the database and select it as the current
-           course.
-        """
-        year = typed_input("Enter year: ", validators.year)
-        semester = typed_input("Enter semester: ", validators.semester)
-        course_num = typed_input("Enter course number: ",
-                                 validators.course_number)
-        course_name = typed_input("Enter course name: ",
-                                  validators.course_name)
-
-        course_id = db.create_course(
-            self.db_connection,
-            year=year, semester=semester,
-            name=course_name, number=course_num)
-
-        self.course_id = course_id
-
-    @require('db_connection', change_database,
-             "A database connection is required to edit assignments.")
+             "A database connection is required to edit courses.")
     def edit_courses(self):
         """Edit courses.
            Select, create, edit and delete courses."""
@@ -483,13 +447,7 @@ class SimpleUI(BaseUI):
                    % self.course_formatter(c))
             return True
         
-#        format_str = ("{name: <20s} {due_date: <10s} {grade_type: <7s} {weight: <6} "
-#                      "{description: <32s}")
-#        formatter = lambda r: format_str.format(**r)
         formatter = self.course_formatter
-        # header = format_str.format(name="Name", due_date="Due date",
-        #                            grade_type="Type", weight="Weight",
-        #                            description="Description")
         header = "Courses"
         courses = db.select_courses(self.db_connection)
         
@@ -502,7 +460,7 @@ class SimpleUI(BaseUI):
 
     @require('db_connection', change_database,
              "A database connection is required to edit assignments.")
-    @require('course_id', change_course,
+    @require('course_id', edit_courses,
              "A selected course is required to edit assignments.")
     def edit_assignments(self):
         """Edit assignments.
@@ -598,7 +556,7 @@ class SimpleUI(BaseUI):
         
     @require('db_connection', change_database,
              "A database connection is required to enter grades.")
-    @require('course_id', change_course,
+    @require('course_id', edit_courses,
              "A selected course is required to enter grades.")
     @require('assignment_id', edit_assignments,
              "A selected assignment is required to enter grades.")
@@ -652,7 +610,7 @@ class SimpleUI(BaseUI):
 
     @require('db_connection', change_database,
              "A database connection is required to edit grades.")
-    @require('course_id', change_course,
+    @require('course_id', edit_courses,
              "A selected course is required to edit grades.")
     def edit_grades(self):
         """Edit grades.
@@ -733,7 +691,7 @@ class SimpleUI(BaseUI):
 
     @require('db_connection', change_database,
              "A database connection is required to import students.")
-    @require('course_id', change_course,
+    @require('course_id', edit_courses,
              "A selected course is required to import students.")
     def import_students(self):
         """Import students.
@@ -863,7 +821,7 @@ class SimpleUI(BaseUI):
         
     @require('db_connection', change_database,
              "A database connection is required to edit students in course.")
-    @require('course_id', change_course,
+    @require('course_id', edit_courses,
              "A selected course is required to edit students in course.")
     def edit_course_members(self):
         """Edit course enrollments.
@@ -904,7 +862,7 @@ class SimpleUI(BaseUI):
 
     @require('db_connection', change_database,
              "A database connection is required to export grades.")
-    @require('course_id', change_course,
+    @require('course_id', edit_courses,
              "A selected course is required to export grades.")
     def export_grades(self):
         """Export grades.
@@ -969,7 +927,7 @@ class SimpleUI(BaseUI):
                 
     @require('db_connection', change_database,
              "A database connection is required to calculate grades.")
-    @require('course_id', change_course,
+    @require('course_id', edit_courses,
              "A selected course is required to calculate grades.")
     def calculate_grades(self):
         """Calculate grades.
@@ -1080,7 +1038,7 @@ class SimpleUI(BaseUI):
 
     @require('db_connection', change_database,
              "A database connection is required to view a grade report.")
-    @require('course_id', change_course,
+    @require('course_id', edit_courses,
              "A selected course is required to view a grade report.")
     def grade_report(self):
         """View grade report.
