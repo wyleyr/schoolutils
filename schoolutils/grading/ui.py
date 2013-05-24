@@ -1227,8 +1227,11 @@ class SimpleUI(BaseUI):
             try:
                 print row_format.format(index="Row", frow=header)
                 print header_underline
-                for i, r in enumerate(editable_rows):
-                    print row_format.format(index=i, frow=formatter(r))
+                if editable_rows:
+                    for i, r in enumerate(editable_rows):
+                        print row_format.format(index=i, frow=formatter(r))
+                else:
+                    print "(No rows yet.)"
 
                 print ""
                 prompt = "Press Ctrl-C to end.\n"
