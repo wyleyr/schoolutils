@@ -325,8 +325,8 @@ class SimpleUI(BaseUI):
             self.actions_menu(
                 "Main menu.",
                 [self.change_database,
-                 self.change_course,
-                 self.change_assignment,
+                 self.edit_courses,
+                 self.edit_assignments,
                  self.import_students,
                  self.edit_student,
                  self.enter_grades,
@@ -342,19 +342,6 @@ class SimpleUI(BaseUI):
             self.db_connection.commit()
 
            
-    @require('db_connection', change_database,
-             "A database connection is required to change the current course.")
-    def change_course(self):
-        """Change current course.
-           Select an existing course from the database, or add a new one.
-        """
-        # TODO: add support for selecting from user_config.current_courses
-        self.print_course_info()
-        self.actions_menu("What do you want to do?",
-                        [self.select_course,
-                         self.create_course])
-
-        
     @require('db_connection', change_database,
              "A database connection is required to select a course.")
     def select_course(self):
@@ -388,97 +375,190 @@ class SimpleUI(BaseUI):
                 print "Selected: %s" % self.course_formatter(course)
                 self.course_id = course['id']
 
+    @require('db_connection', change_database,
+             "A database connection is required to edit courses.")
+    def edit_courses(self):
+        """Edit courses.
+           Select, create, edit and delete courses."""
+        def edit_course(c):
+            make_default_clause = lambda v: (" (default: %s)" % str(v)
+                                             if v else '')
+            name_prompt = "Enter course name{default}: ".format(
+                default=make_default_clause(c['name']))
+            course_name = typed_input(name_prompt, validators.course_name,
+                                      default=c['name'])
+            year_prompt = "Enter year{default}: ".format(
+                default=make_default_clause(c['year']))
+            year = typed_input(year_prompt, validators.year, default=c['year'])
+            sem_prompt = "Enter semester{default}: ".format(
+                default=make_default_clause(c['semester']))
+            semester = typed_input(sem_prompt, validators.semester,
+                                   default=c['semester'])
+            num_prompt = "Enter course number{default}: ".format(
+                default=make_default_clause(c['number']))
+            course_num = typed_input(num_prompt, validators.course_number,
+                                     default=c['number'])
+            
+            course_id = db.create_or_update_course(
+                self.db_connection,
+                course_id=c['id'],
+                year=year,
+                semester=semester,
+                name=course_name,
+                number=course_num)
+
+            return db.select_courses(self.db_connection, course_id=course_id)[0]
+        
+        create_course = lambda: edit_course({
+                'id': None,
+                'name': None,
+                'year': None,
+                'semester': None,
+                'number': None,
+                })
                 
-    @require('db_connection', change_database,
-             "A database connection is required to create a course")
-    def create_course(self):
-        """Create a new course.
-           Add a new course to the database and select it as the current
-           course.
-        """
-        year = typed_input("Enter year: ", validators.year)
-        semester = typed_input("Enter semester: ", validators.semester)
-        course_num = typed_input("Enter course number: ",
-                                 validators.course_number)
-        course_name = typed_input("Enter course name: ",
-                                  validators.course_name)
+        def delete_course(c):
+            existing_assignments = db.select_assignments(self.db_connection,
+                                                         course_id=c['id'])
+            existing_grades = filter(lambda g: g['value'] is not None,
+                                     db.select_grades_for_course_members(
+                                       self.db_connection,
+                                       course_id=c['id']))
+            enrollees = db.select_students(self.db_connection, course_id=c['id'])
+            if existing_assignments:
+                print ("WARNING: there are %d existing assignments for this course, "
+                       "with %d associated grades.\n"
+                       "Deleting this course will DELETE THESE ASSIGNMENTS AND GRADES, "
+                       "and UNENROLL %d STUDENTS." %
+                       (len(existing_assignments), len(existing_grades), len(enrollees)))
+                if not typed_input("Delete anyway? (Y/N) ", yn_bool):
+                    return False
 
-        course_id = db.create_course(
-            self.db_connection,
-            year=year, semester=semester,
-            name=course_name, number=course_num)
+            # deselect if this assignment was the currently selected assignment
+            if self.course_id == c['id']:
+                self.course_id = None
+                
+            return db.delete_course_etc(self.db_connection,
+                                        course_id=c['id'])
 
-        self.course_id = course_id
-
+        def select_course(c):
+            self.course_id = c['id']
+            print ("Selected course %s as current course.\n"
+                   % self.course_formatter(c))
+            return True
         
-    @require('db_connection', change_database,
-             "A database connection is required to change the current assignment.")
-    def change_assignment(self):
-        """Change current assignment.
-           Select an existing assignment from the database, or add a new one.
-        """
-        self.print_assignment_info()
-        self.actions_menu("What do you want to do?",
-            [self.select_assignment, self.create_assignment])
-
+        formatter = self.course_formatter
+        header = "Courses"
+        courses = db.select_courses(self.db_connection)
         
+        self.edit_table(courses, header, formatter,
+                        editor=edit_course,
+                        creator=create_course,
+                        deleter=delete_course,
+                        selector=select_course)
+ 
+
     @require('db_connection', change_database,
-             "A database connection is required to select an assignment.")
-    @require('course_id', change_course,
-             "A selected course is required to select an assignment.")
-    def select_assignment(self):
-        """Select an assignment.
-           Lookup an existing assignment in the database.
-        """
+             "A database connection is required to edit assignments.")
+    @require('course_id', edit_courses,
+             "A selected course is required to edit assignments.")
+    def edit_assignments(self):
+        """Edit assignments.
+           Select, create, edit and delete assignments for the current course."""
+        def edit_assignment(a):
+            make_default_clause = lambda v: (" (default: %s)" % str(v)
+                                             if v else '')
+            name_prompt = "Enter assignment name{default}: ".format(
+                default=make_default_clause(a['name']))
+            name = typed_input(name_prompt, validators.assignment_name,
+                               default=a['name'])
+            desc_prompt = "Enter description{default}: ".format(
+                default=make_default_clause(a['description']))
+            description = typed_input(desc_prompt, str,
+                                      default=a['description'])
+            due_date_prompt = "Enter due date (YYYY-MM-DD){default}: ".format(
+                default=make_default_clause(a['due_date']))
+            due_date = typed_input(due_date_prompt, validators.date,
+                                   default=a['due_date'])
+            grade_type_prompt = "Enter grade type{default}: ".format(
+                default=make_default_clause(a['grade_type']))
+            grade_type = typed_input(grade_type_prompt, validators.grade_type,
+                                     default=a['grade_type'])
+            gt_unchanged = (grade_type == a['grade_type'])
+            if grade_type == "points":
+                wt_prompt = "Enter number of possible points{default}: ".format(
+                    default=make_default_clause(
+                        # don't use default if grade type changed
+                        a['weight'] if gt_unchanged else ''))
+            else:
+                wt_prompt = "Enter grade weight (as decimal fraction of 1){default}: ".format(
+                    default=make_default_clause(
+                        # don't use default if grade type changed
+                        a['weight'] if gt_unchanged else ''))
+            weight = typed_input(wt_prompt, validators.grade_weight,
+                                 default=a['weight'])
+
+            a_id = db.create_or_update_assignment(
+                self.db_connection,
+                assignment_id=a['id'],
+                course_id=self.course_id,
+                name=name, description=description, grade_type=grade_type,
+                due_date=due_date, weight=weight)
+
+            return db.select_assignments(self.db_connection, assignment_id=a_id)[0]
+
+        create_assignment = lambda: edit_assignment({
+                'id': None,
+                'name': None,
+                'description': '',
+                'due_date': None,
+                'grade_type': None,
+                'weight': None
+                })
+                
+        def delete_assignment(a):
+            existing_grades = db.select_grades(self.db_connection,
+                                               assignment_id=a['id'])
+            if existing_grades:
+                print ("WARNING: there are %d existing grades for this assignment.\n"
+                       "Deleting this assignment WILL ALSO DELETE THEM." %
+                       len(existing_grades))
+                if not typed_input("Delete anyway? (Y/N) ", yn_bool):
+                    return False
+
+            # deselect if this assignment was the currently selected assignment
+            if self.assignment_id == a['id']:
+                self.assignment_id = None
+                
+            return db.delete_assignment_and_grades(self.db_connection,
+                                                   assignment_id=a['id'])
+
+        def select_assignment(a):
+            self.assignment_id = a['id']
+            print ("Selected assignment %s as current assignment.\n"
+                   % self.assignment_formatter(a))
+            return True
+        
+        format_str = ("{name: <20s} {due_date: <10s} {grade_type: <7s} {weight: <6} "
+                      "{description: <32s}")
+        formatter = lambda r: format_str.format(**r)
+        header = format_str.format(name="Name", due_date="Due date",
+                                   grade_type="Type", weight="Weight",
+                                   description="Description")
         assignments = db.select_assignments(self.db_connection,
                                             course_id=self.course_id)
-        if len(assignments) == 0:
-            create = typed_input(
-                "No assignments found for the current course.  Create? (Y/N) ",
-                yn_bool)
-            if create:
-                return self.create_assignment()
-            else:
-                print "No assignment selected or created."
-        else:
-            assignment = self.options_menu(
-                "Select an assignment for this course:",
-                assignments, self.assignment_formatter,
-                escape=self.create_assignment, allow_none=True)
-            if assignment:
-                self.assignment_id = assignment['id']
-                
-            
-    @require('db_connection', change_database,
-             "A database connection is required to create an assignment.")
-    @require('course_id', change_course,
-             "A selected course is required to create an assignment.")
-    def create_assignment(self):
-        """Create a new assignment.
-           Add a new assignment to the database and select it as the current assignment.
-        """
-        name = typed_input("Enter assignment name: ", validators.assignment_name)
-        description = typed_input("Enter description: ", str, default='')
-        due_date = typed_input("Enter due date (YYYY-MM-DD): ", validators.date)
-        grade_type = typed_input("Enter grade type: ", validators.grade_type)
-        if grade_type == "points":
-            weight_prompt = "Enter number of possible points: "
-        else:
-            weight_prompt = "Enter grade weight (as decimal fraction of 1): "
-        weight = typed_input(weight_prompt, validators.grade_weight)
-
-        self.assignment_id = db.create_assignment(
-            self.db_connection,
-            course_id=self.course_id,
-            name=name, description=description, grade_type=grade_type,
-            due_date=due_date, weight=weight)
-
+        
+        self.edit_table(assignments, header, formatter,
+                        editor=edit_assignment,
+                        creator=create_assignment,
+                        deleter=delete_assignment,
+                        selector=select_assignment)
         
     @require('db_connection', change_database,
              "A database connection is required to enter grades.")
-    @require('course_id', change_course,
+    @require('course_id', edit_courses,
              "A selected course is required to enter grades.")
-    @require('assignment_id', change_assignment,
+    @require('assignment_id', edit_assignments,
              "A selected assignment is required to enter grades.")
     def enter_grades(self):
         """Enter grades.
@@ -530,7 +610,7 @@ class SimpleUI(BaseUI):
 
     @require('db_connection', change_database,
              "A database connection is required to edit grades.")
-    @require('course_id', change_course,
+    @require('course_id', edit_courses,
              "A selected course is required to edit grades.")
     def edit_grades(self):
         """Edit grades.
@@ -611,7 +691,7 @@ class SimpleUI(BaseUI):
 
     @require('db_connection', change_database,
              "A database connection is required to import students.")
-    @require('course_id', change_course,
+    @require('course_id', edit_courses,
              "A selected course is required to import students.")
     def import_students(self):
         """Import students.
@@ -635,7 +715,7 @@ class SimpleUI(BaseUI):
                             'email': "Email", 'sid': "SID"})
         students = self.edit_table(students, header, formatter,
                                    editor=editor, creator=creator,
-                                   deleter=lambda s: None)
+                                   deleter=lambda s: True)
 
         for s in students:
             try:
@@ -726,6 +806,7 @@ class SimpleUI(BaseUI):
                                     student_id=student['id'],
                                     course_id=course_id)
             print "Student deleted from %s" % self.course_formatter(course)
+            return True
 
         current_courses = db.select_courses(self.db_connection,
                                             student_id=student['id'])
@@ -740,19 +821,29 @@ class SimpleUI(BaseUI):
         
     @require('db_connection', change_database,
              "A database connection is required to edit students in course.")
-    @require('course_id', change_course,
+    @require('course_id', edit_courses,
              "A selected course is required to edit students in course.")
     def edit_course_members(self):
         """Edit course enrollments.
            Add or remove one or more students in the current course.
         """
+        def add_to_course():
+            student = self.get_student(create=True)
+            db.create_course_member(self.db_connection,
+                                    student_id=student['id'],
+                                    course_id=self.course_id)
+            print ("Added %s to course." %
+                   self.student_formatter(student))
+            return student
+            
         def remove_from_course(student):
-            student_id = student[0]
+            student_id = student['id']
             db.delete_course_member(self.db_connection,
                                     student_id=student_id,
                                     course_id=self.course_id)
             print ("Deleted student %s from course." %
                    self.student_formatter(student))
+            return True
 
         current_students = db.select_students(self.db_connection,
                                               course_id=self.course_id)
@@ -762,8 +853,7 @@ class SimpleUI(BaseUI):
             current_students,
             "Current students in %s" % self.course_formatter(current_course),
             self.student_formatter,
-            # TODO: allow escape from get_student
-            creator=lambda: self.get_student(create=True),
+            creator=add_to_course,
             deleter=remove_from_course)
         print "Course enrollments updated."
  
@@ -772,7 +862,7 @@ class SimpleUI(BaseUI):
 
     @require('db_connection', change_database,
              "A database connection is required to export grades.")
-    @require('course_id', change_course,
+    @require('course_id', edit_courses,
              "A selected course is required to export grades.")
     def export_grades(self):
         """Export grades.
@@ -837,7 +927,7 @@ class SimpleUI(BaseUI):
                 
     @require('db_connection', change_database,
              "A database connection is required to calculate grades.")
-    @require('course_id', change_course,
+    @require('course_id', edit_courses,
              "A selected course is required to calculate grades.")
     def calculate_grades(self):
         """Calculate grades.
@@ -948,7 +1038,7 @@ class SimpleUI(BaseUI):
 
     @require('db_connection', change_database,
              "A database connection is required to view a grade report.")
-    @require('course_id', change_course,
+    @require('course_id', edit_courses,
              "A selected course is required to view a grade report.")
     def grade_report(self):
         """View grade report.
@@ -1060,7 +1150,7 @@ class SimpleUI(BaseUI):
             return None
 
     def edit_table(self, rows, header, formatter, editor=None,
-                   creator=None, deleter=None):
+                   creator=None, deleter=None, selector=None):
         """Present a simple interface for reviewing and editing tabular data.
            rows should be a sequence of values for the user to review and edit
            header should be a string to print above the table
@@ -1071,7 +1161,14 @@ class SimpleUI(BaseUI):
            creator, if provided, should be a function with no arguments which
              returns a new row value based on user input  
            deleter, if provided, should be a function to call for its side
-             effects with the row value when the user deletes a row
+             effects with the row value when the user deletes a row.
+             It should return False if deletion was aborted or unsuccessful,
+             and a true value otherwise.
+           selector, if provided, should be a function to call for its side
+             effects with the row value when the user selects a row to be the
+             currently-selected value (e.g., current assignment or course).
+             It should return True if this function should exit after a selection
+             is made, False otherwise.
            Returns the edited rows.
         """
         editable_rows = [r for r in rows]
@@ -1082,8 +1179,11 @@ class SimpleUI(BaseUI):
             if s.startswith('d'):
                 action = 'd'
                 idx = validators.int_in_range(s[1:], 0, len(editable_rows)+1)
-            elif s.startswith('i'):
-                action = 'i'
+            elif s.startswith('s'):
+                action = 's'
+                idx = validators.int_in_range(s[1:], 0, len(editable_rows)+1)
+            elif s.startswith('c'):
+                action = 'c'
                 idx = None
             else:
                 action = 'e'
@@ -1094,17 +1194,22 @@ class SimpleUI(BaseUI):
             try:
                 print row_format.format(index="Row", frow=header)
                 print header_underline
-                for i, r in enumerate(editable_rows):
-                    print row_format.format(index=i, frow=formatter(r))
+                if editable_rows:
+                    for i, r in enumerate(editable_rows):
+                        print row_format.format(index=i, frow=formatter(r))
+                else:
+                    print "(No rows yet.)"
 
                 print ""
                 prompt = "Press Ctrl-C to end.\n"
                 if editor:
                     prompt += "Enter row # to edit. " 
                 if creator:
-                    prompt += "Enter 'i' to insert a new row. "
+                    prompt += "Enter 'c' to create a new row. "
                 if deleter:
                     prompt += "Prefix row # with 'd' to delete. "
+                if selector:
+                    prompt += "\nTo make a selection, prefix row # with 's'. "
                 prompt += "\nWhat do you want to do? "
                     
                 action, idx = typed_input(prompt, validator)
@@ -1112,15 +1217,21 @@ class SimpleUI(BaseUI):
                     new_row = editor(editable_rows[idx])
                     if new_row: # editor might return None
                         editable_rows[idx] = new_row
-                elif action == 'd':
-                    to_delete = editable_rows.pop(idx)
-                    if deleter:
-                        deleter(to_delete)
-                elif action == 'i' and creator: 
+                elif action == 'd' and deleter:
+                    success = deleter(editable_rows[idx])
+                    if success:
+                        editable_rows.pop(idx)
+                    else:
+                        print "Deletion unsuccessful."
+                elif action == 'c' and creator: 
                     new_row = creator()
                     if new_row: # creator might return None
                         editable_rows.append(new_row)
-
+                elif action == 's' and selector:
+                    should_exit = selector(editable_rows[idx])
+                    if should_exit:
+                        return editable_rows
+                    
             except KeyboardInterrupt:
                 print ""
                 break
