@@ -327,6 +327,7 @@ class SimpleUI(BaseUI):
                 [self.change_database,
                  self.change_course,
                  self.change_assignment,
+                 self.edit_assignments,
                  self.import_students,
                  self.edit_student,
                  self.enter_grades,
@@ -473,6 +474,101 @@ class SimpleUI(BaseUI):
             name=name, description=description, grade_type=grade_type,
             due_date=due_date, weight=weight)
 
+    @require('db_connection', change_database,
+             "A database connection is required to edit assignments.")
+    @require('course_id', change_course,
+             "A selected course is required to edit assignments.")
+    def edit_assignments(self):
+        """Edit assignments.
+           Select, create, edit and delete assignments for the current course."""
+        def edit_assignment(a):
+            make_default_clause = lambda v: (" (default: %s)" % str(v)
+                                             if v else '')
+            name_prompt = "Enter assignment name{default}: ".format(
+                default=make_default_clause(a['name']))
+            name = typed_input(name_prompt, validators.assignment_name,
+                               default=a['name'])
+            desc_prompt = "Enter description{default}: ".format(
+                default=make_default_clause(a['description']))
+            description = typed_input(desc_prompt, str,
+                                      default=a['description'])
+            due_date_prompt = "Enter due date (YYYY-MM-DD){default}: ".format(
+                default=make_default_clause(a['due_date']))
+            due_date = typed_input(due_date_prompt, validators.date,
+                                   default=a['due_date'])
+            grade_type_prompt = "Enter grade type{default}: ".format(
+                default=make_default_clause(a['grade_type']))
+            grade_type = typed_input(grade_type_prompt, validators.grade_type,
+                                     default=a['grade_type'])
+            gt_unchanged = (grade_type == a['grade_type'])
+            if grade_type == "points":
+                wt_prompt = "Enter number of possible points{default}: ".format(
+                    default=make_default_clause(
+                        # don't use default if grade type changed
+                        a['weight'] if gt_unchanged else ''))
+            else:
+                wt_prompt = "Enter grade weight (as decimal fraction of 1){default}: ".format(
+                    default=make_default_clause(
+                        # don't use default if grade type changed
+                        a['weight'] if gt_unchanged else ''))
+            weight = typed_input(wt_prompt, validators.grade_weight,
+                                 default=a['weight'])
+
+            a_id = db.create_or_update_assignment(
+                self.db_connection,
+                assignment_id=a['id'],
+                course_id=self.course_id,
+                name=name, description=description, grade_type=grade_type,
+                due_date=due_date, weight=weight)
+
+            return db.select_assignments(self.db_connection, assignment_id=a_id)[0]
+
+        create_assignment = lambda: edit_assignment({
+                'id': None,
+                'name': None,
+                'description': '',
+                'due_date': None,
+                'grade_type': None,
+                'weight': None
+                })
+                
+        def delete_assignment(a):
+            existing_grades = db.select_grades(self.db_connection,
+                                               assignment_id=a['id'])
+            if existing_grades:
+                print ("WARNING: there are %d existing grades for this assignment.\n"
+                       "Deleting this assignment WILL ALSO DELETE THEM." %
+                       len(existing_grades))
+                if not typed_input("Delete anyway? (Y/N) ", yn_bool):
+                    return False
+
+            # deselect if this assignment was the currently selected assignment
+            if self.assignment_id == a['id']:
+                self.assignment_id = None
+                
+            return db.delete_assignment_and_grades(self.db_connection,
+                                                   assignment_id=a['id'])
+
+        def select_assignment(a):
+            self.assignment_id = a['id']
+            print ("Selected assignment %s as current assignment.\n"
+                   % self.assignment_formatter(a))
+            return True
+        
+        format_str = ("{name: <20s} {due_date: <10s} {grade_type: <7s} {weight: <6} "
+                      "{description: <32s}")
+        formatter = lambda r: format_str.format(**r)
+        header = format_str.format(name="Name", due_date="Due date",
+                                   grade_type="Type", weight="Weight",
+                                   description="Description")
+        assignments = db.select_assignments(self.db_connection,
+                                            course_id=self.course_id)
+        
+        self.edit_table(assignments, header, formatter,
+                        editor=edit_assignment,
+                        creator=create_assignment,
+                        deleter=delete_assignment,
+                        selector=select_assignment)
         
     @require('db_connection', change_database,
              "A database connection is required to enter grades.")
