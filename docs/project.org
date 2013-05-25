@@ -364,8 +364,9 @@ Affected functions:
    so we could say things like:
    $ grade -c 146 -s spring -y 2013 --import-students < student_list.txt
    $ grade -c 146 -s spring -y 2013 --calculate-grades --export-grades > grades.csv
-** TODO [#B] Remove broken code from 0.1.5 release	      :bug:packaging:
+** CANCELED [#B] Remove broken code from 0.1.5 release	      :bug:packaging:
    in institutions directory...produces error message during install
+   (seems to have resolved itself...)
 ** DONE [#A] Adding student to course doesn't work		     :bug:ui:
 Observed problems:
 1) student doesn't end up in course when added via edit_course_members!
