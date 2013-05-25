@@ -150,14 +150,24 @@ Validator function
    See the sample ``validators.py`` module for more information and a
    list of the validators you can define.
 
+
 Command-line options
 --------------------
 To see command-line options available for the grading program, use::
 
   $ grade --help
 
+Warning
+-------
+schoolutils is alpha-quality software.  It is offered in the hope you
+find it useful, but (like all software) it has bugs, so please take
+sensible precautions to protect your data.  In particular, you should
+**backup your grade database file(s)** regularly!  This is easy, because
+SQLite stores your whole grade database as a single flat file, so just
+do it!
 
-
-
+As with all Free software, schoolutils has no warranty.  Please see
+the warranty notice in the license file or the individual source files
+for more information.
 
 
