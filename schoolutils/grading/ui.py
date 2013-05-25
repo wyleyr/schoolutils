@@ -574,16 +574,38 @@ class SimpleUI(BaseUI):
         print "Use Control-C to finish entering grades."
         while True:
             try:
-                student_id, last_name, first_name, sid, _ = self.get_student()
+                student = self.get_student()
+                # avoid entering grades for non-member students:
+                try:
+                    membership = db.ensure_unique(db.select_course_memberships(
+                            self.db_connection,
+                            course_id=self.course_id,
+                            student_id=student['id']))
+                except db.NoRecordsFound:
+                    course = db.select_courses(self.db_connection,
+                                               course_id=self.course_id)[0]
+                    print ("{student} is not a member of {course}".format(
+                            student=self.student_formatter(student),
+                            course=self.course_formatter(course)))
+                    # offer to add to course, but don't refuse to continue if not
+                    if typed_input("Add this student to the course? (Y/N) ", yn_bool):
+                       db.create_course_member(self.db_connection,
+                                               student_id=student['id'],
+                                               course_id=self.course_id)
+                    else:
+                        print ("WARNING: grades for this student will not be "
+                               "calculated or reported unless you add him or her "
+                               "to the course later.")
+                           
                 grade_id = None
                 grade_val = typed_input("Enter grade value: ", grade_validator)
                 existing_grades = db.select_grades(self.db_connection,
-                                                   student_id=student_id,
+                                                   student_id=student['id'],
                                                    course_id=self.course_id,
                                                    assignment_id=self.assignment_id)
                 if existing_grades:
                     print "Student has existing grades for this assignment."
-                    print "Existing grades are: %s" % ",".join(
+                    print "Existing grades are: %s" % ", ".join(
                         str(g['value']) for g in existing_grades)
                     update = typed_input("Update/overwrite? (Y/N) ", yn_bool)
                     if update:
@@ -594,14 +616,16 @@ class SimpleUI(BaseUI):
                             grade = self.options_menu(
                                 "Select a grade to update.",
                                 existing_grades,
-                                lambda g: "{0}: {1}".format(g['assignment_name'],
-                                                            g['value']))
+                                # TODO: show timestamp?
+                                lambda g: "{0}: {1}".format(
+                                    g['assignment_name'],
+                                    g['value']))
                         grade_id = grade['id']
 
                 db.create_or_update_grade(self.db_connection,
                                           grade_id=grade_id,
                                           assignment_id=self.assignment_id,
-                                          student_id=student_id,
+                                          student_id=student['id'],
                                           value=grade_val)
                                           
             except KeyboardInterrupt:
