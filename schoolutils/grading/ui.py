@@ -786,6 +786,9 @@ class SimpleUI(BaseUI):
             current_courses = db.select_courses(self.db_connection,
                                                 student_id=student['id'])
             options = filter(lambda c: c not in current_courses, all_courses)
+            if not options:
+                print "\nThis student is already enrolled in every course."
+                return None
             course = self.options_menu(
                 "Which course should the student be added to?",
                 options,
