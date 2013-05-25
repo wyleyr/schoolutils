@@ -1196,6 +1196,7 @@ class SimpleUI(BaseUI):
                 
         while True:
             try:
+                print ""
                 print row_format.format(index='#', frow=header)
                 print header_underline
                 if editable_rows:
