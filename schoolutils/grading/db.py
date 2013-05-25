@@ -197,6 +197,61 @@ def create_course(db_connection, year=None, semester=None, name=None,
     db_connection.execute(query, params)
 
     return last_insert_rowid(db_connection)
+
+def create_or_update_course(db_connection, course_id=None, year=None,
+                            semester=None, name=None, number=None):
+    """Create a new course or update a record of an existing course.
+       Returns the id of the created or updated row.
+
+       WARNING: This function uses SQLite's INSERT OR REPLACE
+       statement rather than an UPDATE statement.  If you pass
+       course_id, it *will* erase data in an existing row of the
+       courses table on a conflict; you must provide all values to
+       replace the existing data.
+    """
+    base_query = """
+    INSERT OR REPLACE INTO courses (%(fields)s) VALUES (%(places)s);
+    """
+    fields, places, params = make_values_clause(
+        ['id', 'year', 'semester', 'name', 'number'],
+        [course_id, year, semester, name, number])
+    query = base_query % {'fields': fields, 'places': places}
+    db_connection.execute(query, params)
+
+    return last_insert_rowid(db_connection)
+
+def delete_course_etc(db_connection, course_id=None):
+    """Delete a course and all associated rows.
+       Returns number of deleted course rows.
+
+       WARNING: this function deletes all assignments, grades, and memberships
+       associated with this course.
+       course_id is required; this function will not delete more than
+       one course.
+    """
+    if not course_id:
+        raise ValueError("course_id is required to delete course row.")
+    
+    grades_query = """
+    DELETE FROM grades WHERE assignment_id IN
+      (SELECT id FROM assignments WHERE course_id=?);
+    """
+    assignments_query = """
+    DELETE FROM assignments WHERE course_id=?;
+    """
+    members_query = """
+    DELETE FROM course_memberships WHERE course_id=?;
+    """
+    course_query = """
+    DELETE FROM courses WHERE id=?;
+    """
+    params = (course_id,)
+    db_connection.execute(grades_query, params)
+    db_connection.execute(assignments_query, params)
+    db_connection.execute(members_query, params)
+    db_connection.execute(course_query, params)
+
+    return num_changes(db_connection)   
     
 def select_assignments(db_connection, assignment_id=None, course_id=None,
                        year=None, semester=None, name=None):
@@ -239,6 +294,50 @@ def create_assignment(db_connection, course_id=None, name=None, description=None
 
     return last_insert_rowid(db_connection)
   
+def create_or_update_assignment(db_connection, assignment_id=None,
+                                course_id=None, name=None, description=None,
+                                due_date=None, grade_type=None, weight=None):
+    """Create a new assignment or update a record of an existing assignment.
+       Returns the id of the created or updated row.
+
+       WARNING: This function uses SQLite's INSERT OR REPLACE
+       statement rather than an UPDATE statement.  If you pass
+       assignment_id, it *will* erase data in an existing row of the
+       assignments table on a conflict; you must provide all values to
+       replace the existing data.
+    """
+    base_query = """
+    INSERT OR REPLACE INTO assignments (%(fields)s) VALUES (%(places)s);
+    """
+    fields, places, params = make_values_clause(
+        ['id', 'course_id', 'name', 'description', 'due_date',
+         'grade_type', 'weight'],
+        [assignment_id, course_id, name, description, due_date,
+         grade_type, weight])
+    
+    query = base_query % {'fields': fields, 'places': places}
+    db_connection.execute(query, params)
+    
+    return last_insert_rowid(db_connection)
+
+def delete_assignment_and_grades(db_connection, assignment_id=None):
+    """Delete an assignment and all associated grades.
+       Returns number of deleted assignment rows.
+       
+       assignment_id is required; this function will not delete more than
+       one assignment.
+    """
+    if not assignment_id:
+        raise ValueError("assignment_id is required to delete assignment row.")
+    
+    query1 = "DELETE FROM grades WHERE assignment_id=?;"
+    query2 = "DELETE FROM assignments WHERE id=?;"
+    params = (assignment_id,)
+    db_connection.execute(query1, params)
+    db_connection.execute(query2, params)
+
+    return num_changes(db_connection)
+
 def select_students(db_connection, student_id=None, year=None, semester=None,
                     course_id=None, course_name=None, last_name=None,
                     first_name=None, sid=None, email=None,
@@ -258,6 +357,7 @@ def select_students(db_connection, student_id=None, year=None, semester=None,
         ON (course_memberships.student_id=students.id AND
             course_memberships.course_id=courses.id)
         %(where)s
+        ORDER BY students.last_name ASC, students.first_name ASC
         """
     else:
         # don't perform a join without any course information to constrain the query:
@@ -267,6 +367,7 @@ def select_students(db_connection, student_id=None, year=None, semester=None,
                students.sid, students.email
         FROM students
         %(where)s
+        ORDER BY students.last_name ASC, students.first_name ASC
         """
 
     exact_fields = ['courses.year', 'courses.semester', 'courses.id',

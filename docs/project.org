@@ -22,12 +22,50 @@
 ** TODO [#B] Interfaces to reporting functions		       :ui:reporting:
 ** TODO [#D] More sophisticated UI? Curses-based? 			 :ui:
 ** TODO [#C] Separation of 'view' and 'controller' UI code		 :ui:
-** TODO [#B] Summary statistics					  :reporting:
- - for assignments
- - for a course overall
- - for a course in comparison to others
- - for individual students
- - measure improvement
+** INPROGRESS [#B] Summary statistics				  :reporting:
+*** Grade reports for current course
+It would be nice to:
+  - see averages (mean, median...) by assignment
+  - see high score, low score by assignment
+  - see which students have no score by assignment
+  - see grade trends for individual students and course as a whole
+    (e.g., did students improve overall on second assignment?)
+  - see projected final grades for students?
+  - see how current course compares to others?
+
+*** Implementation proposal
+1) schoolutils.reporting: home for reporting functions
+   - stats module for statistics functions?
+   - functions for generating reports in a variety of formats
+     (HTML? Latex/PDF? Markdown?? Org??)
+   - optional charts module for generating graphs?
+2) access to reports through UI
+   - ReportingUI subclass of BaseUI?
+   - run reports from SimpleUI
+   - view text-based reports in pager
+3) email grade reports to students at end of semester?
+
+Creating reports requires the following phases:
+1) Data gathering: collect the relevant data specific to the report
+2) Calculations: calculate summary statistics
+3) Output formatting
+
+The problem is to create an API that is general enough to handle all
+desireable combinations of data gathering and calculation but without
+having to write specific output formatting code for every report or
+calculation. 
+
+It would be nice for reporting to be this easy:
+#+BEGIN_SRC python
+  # run reports from UI:
+  r = GradeReport(db_connection=self.db_connection, course_id=course_id)
+  
+  print r.as_text() # or run in pager
+  with open('/tmp/grades.html', 'w') as f:
+      f.write(r.as_html())
+  # etc.
+#+END_SRC
+
 ** TODO [#C] PGP encryption/decryption of database file		      :ui:db:
 ** TODO [#A] Export grades to gradebook format		   :bspace:ui:export:
 ** DONE [#C] distribute on PyPI					  :packaging:
@@ -79,11 +117,11 @@
           return user_validators.sid(s)
        else:
           # ...
-** INPROGRESS [#A] Interfaces to edit existing assignments, courses, grades :ui:edit:
+** DONE [#A] Interfaces to edit existing assignments, courses, grades :ui:edit:
    - need to be able to modify and delete these
    - [X] edit_grades
-   - [ ] edit_courses
-   - [ ] edit_assignments
+   - [X] edit_courses
+   - [X] edit_assignments
      
 ** DONE [#A] Make executable scripts with CLI options		     :ui:bin:
    - bin/grade: start the grader
@@ -326,6 +364,30 @@ Affected functions:
    so we could say things like:
    $ grade -c 146 -s spring -y 2013 --import-students < student_list.txt
    $ grade -c 146 -s spring -y 2013 --calculate-grades --export-grades > grades.csv
+** CANCELED [#B] Remove broken code from 0.1.5 release	      :bug:packaging:
+   in institutions directory...produces error message during install
+   (seems to have resolved itself...)
+** DONE [#A] Adding student to course doesn't work		     :bug:ui:
+Observed problems:
+1) student doesn't end up in course when added via edit_course_members!
+2) "Deletion unsuccessful" when deleting existing student.
+
+** DONE [#C] Don't require 's' prefix to make selection in edit_table?	 :ui:
+   Since edit_table is now being used to select current course and
+   assignment, one can reflexively enter the row number to select a
+   row, but that ends up editing the row rather than selecting it,
+   which is not usually what you want.
+   Options:
+   1) always require explicit prefix? ('e' to edit, etc.)
+   2) when selector is present, use different prefixes, allow
+      selection by number?
+            	     
+** TODO [#A] Documentation!					       :docs:
+   - [ ] Tutorial: how to write calculator functions
+   - [ ] Document import/export formats
+   - [ ] complete API docs? autogenerate from docstrings?
+
+** DONE [#A] enter_grades: Offer to add student to current course	 :ui:
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so

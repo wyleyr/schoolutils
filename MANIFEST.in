@@ -3,6 +3,7 @@ include CHANGES.txt
 include LICENSE.txt
 include setup.py
 recursive-include schoolutils *.py 
+prune schoolutils/grading/grader.py
 recursive-include examples *.py
 recursive-include docs *.txt *.org
 

@@ -26,7 +26,7 @@ finally:
     readme.close()
     
 setup(name='schoolutils',
-      version='0.1.5',
+      version='0.1.6',
       description=('Utilities to track and manage student data, including '
                    'a grade database, grade calculators, and more'),
       long_description=long_desc,
@@ -41,7 +41,7 @@ setup(name='schoolutils',
         'Intended Audience :: End Users/Desktop',
         'Intended Audience :: Developers',
         'Environment :: Console',
-        'Development Status :: 2 - Pre-Alpha',
+        'Development Status :: 3 - Alpha',
         ],
       packages=[
         'schoolutils',
@@ -49,6 +49,7 @@ setup(name='schoolutils',
         'schoolutils.grading',
         'schoolutils.institutions',
         'schoolutils.institutions.ucberkeley',
+        'schoolutils.reporting',
         ],
       scripts=['bin/grade',],
       data_files=[('share/schoolutils/examples', ['examples/config.py',
