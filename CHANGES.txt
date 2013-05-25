@@ -1,3 +1,10 @@
+v0.1.6, 2013-05-25 -- Grade reports, UI improvements
+  - new interfaces for editing and deleting courses and assignments;
+    improved interfaces for selecting courses and assignments;
+    support for these operations at db level
+  - basic reporting system and grade reports
+  - more robust aggregation functions in calculator_helpers
+  
 v0.1.5, 2013-05-20 -- Grade editing, calculation, and export features
   - new UI functions: edit_grades, calculate_grades, export_grades
   - name-based access to columns in db queries, via sqlite3.Row
