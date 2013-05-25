@@ -134,6 +134,8 @@ def unweighted_average(values, filter_nan=False):
     "Calculate an unweighted average of values"
     if filter_nan:
         values = remove_none_and_nan(values)
+    if not values:
+        return float('NaN')
     return float(sum(values)) / len(values)
 
 def weighted_average(values, weights, filter_nan=False):
@@ -143,6 +145,8 @@ def weighted_average(values, weights, filter_nan=False):
        the resulting values."""
     if filter_nan:
         values = remove_none_and_nan(values)
+    if not values:
+        return float('NaN')
     return sum([n[0] * n[1] for n in zip(values, weights)])
 
 def points_to_weights(point_values):
@@ -150,6 +154,8 @@ def points_to_weights(point_values):
        The return value at index i is the fraction that point_values[i]
        represents of the sum of point_values."""
     s = sum(point_values)
+    if not s:
+        return [float('NaN') for p in point_values]
     return [float(p)/s for p in point_values]
 
 def calculation_for_type(grades, grade_type, numeric_func,
