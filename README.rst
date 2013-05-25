@@ -10,10 +10,11 @@ student data.  It includes:
 * a command-line interface for interacting with the database 
 * tools for calculating grades  
 * tools for importing and exporting student data in useful formats
+* reports on basic grade statistics
 
 Other planned features include:
 
-* tools for reporting grade statistics
+* tools for reporting more complex grade statistics
 * tools for receiving student assignments via email, and returning
   graded assignments and comments via email
 
@@ -32,9 +33,12 @@ PyPI, unpack it, and run::
 
 from the package directory.
 
-Finally, you can get the development version with ``git``::
+Finally, you can get the development version with ``git``.  The project
+is hosted on both `Bitbucket <https://bitbucket.org/wyleyr/schoolutils>`_
+and `Github <https://github.com/wyleyr/schoolutils>`_ ::
 
   $ git clone https://bitbucket.org/wyleyr/schoolutils.git
+  $ git clone git://github.com/wyleyr/schoolutils.git 
 
 schoolutils has no dependencies (besides the Python standard library),
 so the installation should go smoothly; if you have any problems, please
