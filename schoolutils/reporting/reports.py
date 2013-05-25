@@ -67,6 +67,8 @@ class GradeReport(Report):
                 stats.append({
                         'assignment_id': a['id'],
                         'assignment_name': a['name'],
+                        'grade_type': a['grade_type'],
+                        'weight': a['weight'],
                         'min': mn,
                         'max': mx,
                         'mean': avg,
@@ -78,6 +80,7 @@ class GradeReport(Report):
                         'assignment_id': a['id'],
                         'assignment_name': a['name'],
                         'unavailable': str(e),
+                        'weight': a['weight'],
                         'missing_students': missing,
                         })
 
@@ -91,12 +94,11 @@ class GradeReport(Report):
         mn = ch.min_for_type(values, grade_type)
         mx = ch.max_for_type(values, grade_type)
         avg = ch.mean_for_type(values, grade_type, filter_nan=True)
-        if grade_type == 'letter':
-            if math.isnan(avg):
-                avg = None
-            else:
-                # letter grade is more useful here
-                avg = ch.points_to_letter(avg)
+        if math.isnan(avg):
+            avg = None
+        if avg and grade_type == 'letter':
+            # letter grade is more useful here
+            avg = ch.points_to_letter(avg)
        
         return mn, mx, avg
 
@@ -113,9 +115,10 @@ class GradeReport(Report):
     def as_compact_text(self):
         "Return a compact, tabular representation of this report."
         title_template = "GRADE REPORT: {number}: {name}, {semester} {year}\n"
-        row_template = ("{assignment_name: <25} {mean: <10} {min: <10}"
+        row_template = ("{assignment_name: <15} {weight: <10} {mean: <10} {min: <10}"
                         "{max: <10} {num_missing: <15}\n")
-        header = row_template.format(assignment_name="Assignment", mean="Average",
+        header = row_template.format(assignment_name="Assignment", weight="Weight",
+                                     mean="Average",
                                      min="Minimum", max="Maximum",
                                      num_missing="Missing grades")
         underline = "".join('-' for i in range(len(header))) + "\n"
@@ -132,6 +135,7 @@ class GradeReport(Report):
             if 'unavailable' in s:
                 output.write(row_template.format(
                         assignment_name=s['assignment_name'],
+                        weight=s['weight'],
                         min=None, max=None, mean=None,
                         num_missing=num_missing))
                 continue
@@ -144,8 +148,10 @@ class GradeReport(Report):
         """Return a full representation of this report.
            Includes names of students missing a grade for each assignment."""
         title_template = "GRADE REPORT: {number}: {name}, {semester} {year}\n"
-        stats_template = ("{assignment_name: <25s}\nAverage: {mean: <8} "
-                          "Minimum: {min: <8}  Maximum: {max: <8}\n")
+        stats_template = ("{assignment_name: <25s}\n"
+                          "Grade type: {grade_type: <8s} Weight: {weight: <8}\n"
+                          "Average: {mean: <8} Minimum: {min: <8} "
+                          "Maximum: {max: <8}\n")
         no_stats_msg = ("{assignment_name: <25s}\n  No statistics available for "
                         "this assignment, because:\n  {unavailable}\n")
         missing_template = ("{num_missing} students do not have a grade for this "
