@@ -371,7 +371,7 @@ Observed problems:
 1) student doesn't end up in course when added via edit_course_members!
 2) "Deletion unsuccessful" when deleting existing student.
 
-** TODO [#C] Don't require 's' prefix to make selection in edit_table?	 :ui:
+** DONE [#C] Don't require 's' prefix to make selection in edit_table?	 :ui:
    Since edit_table is now being used to select current course and
    assignment, one can reflexively enter the row number to select a
    row, but that ends up editing the row rather than selecting it,
@@ -386,7 +386,7 @@ Observed problems:
    - [ ] Document import/export formats
    - [ ] complete API docs? autogenerate from docstrings?
 
-** TODO [#A] get_student: Offer to add student to current course	 :ui:
+** DONE [#A] enter_grades: Offer to add student to current course	 :ui:
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so
