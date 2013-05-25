@@ -452,6 +452,7 @@ class SimpleUI(BaseUI):
         courses = db.select_courses(self.db_connection)
         
         self.edit_table(courses, header, formatter,
+                        entity_type='course',
                         editor=edit_course,
                         creator=create_course,
                         deleter=delete_course,
@@ -549,6 +550,7 @@ class SimpleUI(BaseUI):
                                             course_id=self.course_id)
         
         self.edit_table(assignments, header, formatter,
+                        entity_type='assignment',
                         editor=edit_assignment,
                         creator=create_assignment,
                         deleter=delete_assignment,
@@ -1150,7 +1152,7 @@ class SimpleUI(BaseUI):
             return None
 
     def edit_table(self, rows, header, formatter, editor=None,
-                   creator=None, deleter=None, selector=None):
+                   creator=None, deleter=None, selector=None, entity_type='row'):
         """Present a simple interface for reviewing and editing tabular data.
            rows should be a sequence of values for the user to review and edit
            header should be a string to print above the table
@@ -1169,6 +1171,8 @@ class SimpleUI(BaseUI):
              currently-selected value (e.g., current assignment or course).
              It should return True if this function should exit after a selection
              is made, False otherwise.
+           entity_type, if provided, will be used instead of the generic name 'row'
+             when displaying the prompts for selecting, editing, creating, etc.
            Returns the edited rows.
         """
         editable_rows = [r for r in rows]
@@ -1179,37 +1183,38 @@ class SimpleUI(BaseUI):
             if s.startswith('d'):
                 action = 'd'
                 idx = validators.int_in_range(s[1:], 0, len(editable_rows)+1)
-            elif s.startswith('s'):
-                action = 's'
+            elif s.startswith('e'):
+                action = 'e'
                 idx = validators.int_in_range(s[1:], 0, len(editable_rows)+1)
             elif s.startswith('c'):
                 action = 'c'
                 idx = None
             else:
-                action = 'e'
+                action = 's'
                 idx = validators.int_in_range(s, 0, len(editable_rows)+1)
             return action, idx
                 
         while True:
             try:
-                print row_format.format(index="Row", frow=header)
+                print row_format.format(index='#', frow=header)
                 print header_underline
                 if editable_rows:
                     for i, r in enumerate(editable_rows):
                         print row_format.format(index=i, frow=formatter(r))
                 else:
-                    print "(No rows yet.)"
+                    print "(No %s data yet.)" % entity_type
 
                 print ""
                 prompt = "Press Ctrl-C to end.\n"
-                if editor:
-                    prompt += "Enter row # to edit. " 
                 if creator:
-                    prompt += "Enter 'c' to create a new row. "
+                    prompt += "Enter 'c' to create a new %s. " % entity_type
+                if editor:
+                    prompt += "Prefix %s # with 'e' to edit. " % entity_type
                 if deleter:
-                    prompt += "Prefix row # with 'd' to delete. "
+                    prompt += "Prefix %s # with 'd' to delete. " % entity_type
                 if selector:
-                    prompt += "\nTo make a selection, prefix row # with 's'. "
+                    prompt += ("\nEnter %s # to select as current %s. " %
+                               (entity_type, entity_type))
                 prompt += "\nWhat do you want to do? "
                     
                 action, idx = typed_input(prompt, validator)
