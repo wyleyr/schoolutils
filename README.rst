@@ -20,6 +20,34 @@ Other planned features include:
 
 Installation
 ============
+
+Installing locally vs. system-wide
+----------------------------------
+If you are your computer's administrator, you probably want to
+install schoolutils system-wide.  In that case, you need to run the
+``pip`` or ``python`` installation commands below with administrator
+privileges.  On Mac OS X and GNU/Linux, you can generally do that by
+prefixing ``sudo`` to these commands (e.g., ``sudo pip install
+schoolutils``).
+
+If you do not have adminstrative access to the computer where you want
+to install schoolutils, or you simply don't want to install it
+system-wide, there are a couple of options for installing it locally.
+The first is to install schoolutils in a Python `virtual environment
+https://pypi.python.org/pypi/virtualenv`_ that you control.  To do
+this, create and activate a virtual environment, then run the ``pip``
+command below.  The second is to install schoolutils to a directory in
+your control which is on the system Python interpreter's path.  You
+can do that by passing the ``--user`` option to the ``setup.py``
+command below.
+
+Note that if you don't install schoolutils system-wide, you may need
+to adjust your $PATH to make the ``grade`` command available.  A
+virtual environment makes this easy, so that is the recommended method
+for installing locally.
+
+Installation procedures
+-----------------------
 The easiest way to install schoolutils is via `pip
 <http://www.pip-installer.org/en/latest/installing.html>`_::
 
@@ -35,10 +63,13 @@ from the package directory.
 
 Finally, you can get the development version with ``git``.  The project
 is hosted on both `Bitbucket <https://bitbucket.org/wyleyr/schoolutils>`_
-and `Github <https://github.com/wyleyr/schoolutils>`_ ::
+and `Github <https://github.com/wyleyr/schoolutils>`_.  You can get it
+by using one of the following commands::
 
   $ git clone https://bitbucket.org/wyleyr/schoolutils.git
   $ git clone git://github.com/wyleyr/schoolutils.git 
+
+Then run the ``setup.py`` script from the repository root, as above.
 
 schoolutils has no dependencies (besides the Python standard library),
 so the installation should go smoothly; if you have any problems, please
