@@ -26,7 +26,7 @@ finally:
     readme.close()
     
 setup(name='schoolutils',
-      version='0.1.6',
+      version='0.1.6a',
       description=('Utilities to track and manage student data, including '
                    'a grade database, grade calculators, and more'),
       long_description=long_desc,

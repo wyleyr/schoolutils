@@ -1,3 +1,6 @@
+v0.1.6a, 2013-05-28 -- documentation updates
+  - explain how to install system-wide vs. locally
+  
 v0.1.6, 2013-05-25 -- Grade reports, UI improvements
   - new interfaces for editing and deleting courses and assignments;
     improved interfaces for selecting courses and assignments;
