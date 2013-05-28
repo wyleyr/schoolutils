@@ -34,17 +34,17 @@ If you do not have adminstrative access to the computer where you want
 to install schoolutils, or you simply don't want to install it
 system-wide, there are a couple of options for installing it locally.
 The first is to install schoolutils in a Python `virtual environment
-https://pypi.python.org/pypi/virtualenv`_ that you control.  To do
+<https://pypi.python.org/pypi/virtualenv>`_ that you control.  To do
 this, create and activate a virtual environment, then run the ``pip``
 command below.  The second is to install schoolutils to a directory in
 your control which is on the system Python interpreter's path.  You
-can do that by passing the ``--user`` option to the ``setup.py``
-command below.
+can do that by passing the ``--user`` option to the ``python`` command
+below (``python setup.py install --user``).
 
 Note that if you don't install schoolutils system-wide, you may need
-to adjust your $PATH to make the ``grade`` command available.  A
-virtual environment makes this easy, so that is the recommended method
-for installing locally.
+to adjust your shell's $PATH environment variable to make the
+``grade`` command available.  A virtual environment makes this easy,
+so that is the recommended method for installing locally.
 
 Installation procedures
 -----------------------
