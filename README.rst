@@ -63,8 +63,8 @@ from the package directory.
 
 Finally, you can get the development version with ``git``.  The project
 is hosted on both `Bitbucket <https://bitbucket.org/wyleyr/schoolutils>`_
-and `Github <https://github.com/wyleyr/schoolutils>`_.  You can get it
-by using one of the following commands::
+and `Github <https://github.com/wyleyr/schoolutils>`_.  You can clone it
+using one of the following commands::
 
   $ git clone https://bitbucket.org/wyleyr/schoolutils.git
   $ git clone git://github.com/wyleyr/schoolutils.git 
@@ -78,7 +78,7 @@ so the installation should go smoothly; if you have any problems, please
 Configuration
 =============
 It isn't necessary to configure schoolutils, but it will be faster to
-use if you do.  The command-line UI expects to find configuration
+use if you do.  The command-line interface expects to find configuration
 files in the ``.schoolutils`` directory of your home directory.  You
 should create three Python modules there: ``config.py``,
 ``calculators.py``, and ``validators.py``.  Sample configuration files
