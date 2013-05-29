@@ -111,7 +111,7 @@ def calculate_grade_146_spring2013(rows):
              grade_type='letter'),
         # update an existing grade:
         dict(grade_id=some_grade_id,
-             value=new_value)
+             value=new_value),
         # create grade for assignment, e.g., if no value was previously entered:
         dict(assignment_id=some_assignment_id,
              value='F')
