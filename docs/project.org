@@ -382,12 +382,19 @@ Observed problems:
    2) when selector is present, use different prefixes, allow
       selection by number?
             	     
-** TODO [#A] Documentation!					       :docs:
+** TODO [#A] Documentation!						:doc:
    - [ ] Tutorial: how to write calculator functions
    - [ ] Document import/export formats
    - [ ] complete API docs? autogenerate from docstrings?
 
 ** DONE [#A] enter_grades: Offer to add student to current course	 :ui:
+** TODO [#A] Clarify database setup on first run		     :doc:ui:
+   - note that user gets to pick location of gradedb_file in README,
+     config.py comments
+   - deal with first run corner case: user has set gradedb_file, but
+     no db exists yet; user should not have to re-type path
+     (quick fix: just use the value of gradedb_file as the
+     default when prompting for a db location)
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so
