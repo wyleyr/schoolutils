@@ -24,11 +24,18 @@ Sample configuration file for schoolutils
 #
 # General options
 #
+
+# Your name and email address.
 name = 'Your Name'
 email = 'your.email@whatever.edu'
 
-# path to your grade database file 
-gradedb_file = '/path/to/grades.db'
+# Path to the file containing your grade database.
+# The grade database is stored as a single file; you can locate it
+# wherever you want, such as with your other teaching-related files, or
+# in a directory where it will be automatically backed up.  If the file
+# you specify here does not already exist, the grading program will offer 
+# to create it at startup.
+gradedb_file = '~/.schoolutils/grades.db'
 
 #
 # Grading options
@@ -43,12 +50,12 @@ current_semester = 'Spring' # string
 current_year = 2013         # int, not string
 current_courses = ['146',]  # list of strings
 
-# if you specify a string for default_course, it will be in
+# If you specify a string for default_course, it will be used in
 # conjunction with current_semester and current_year to select a
 # current course when you start the grading program
 default_course = current_courses[0]
 
-# if you specify default_assignment as a string in addition to
+# If you specify default_assignment as a string in addition to
 # default_course, it will be selected as the current assignment when
 # you start the grading program
 #default_assignment = "Paper 1"
