@@ -238,20 +238,23 @@ class SimpleUI(BaseUI):
             self.close_database()
         
         db_path = typed_input("Enter path to grade database: ", file_path)
+        create = False
         if not os.path.exists(db_path):
             create = typed_input(
-                "No existing database at %s.  Create (Y/N)? " % db_path,
+                "No existing database at %s.\nCreate (Y/N)? " % db_path,
                 yn_bool)
-            if create:
-                self.db_file = db_path
-                self.db_connection = db.connect(db_path)
-                db.gradedb_init(self.db_connection)
-            else:
-                return None
-        else:
+        try:
             self.db_file = db_path
-            self.db_connection = db.connect(db_path)
-
+            self.db_connection = db.connect(db_path, create=create)
+        except db.ConnectionError as e:
+            print ("Could not open {path} as a grade database.\n"
+                   "Error was: {err}".format(path=db_path, err=e))
+            
+            if typed_input("Try again? (Y/N) ", yn_bool):
+                return self.change_database()
+            else:
+                print "Database change aborted."
+            
             
     def get_student(self, create=False):
         """Lookup a student in the database, trying several methods.
