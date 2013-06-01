@@ -385,7 +385,8 @@ class SimpleUI(BaseUI):
 
             # commit after successful completion of any top-level action
             # to avoid data-loss
-            self.db_connection.commit()
+            if self.db_connection:
+                self.db_connection.commit()
 
            
     @require('db_connection', change_database,
