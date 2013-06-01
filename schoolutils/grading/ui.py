@@ -21,7 +21,7 @@ User interfaces for grading utilities.
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 # 02110-1301, USA.
 
-import os, sys, csv, datetime, tempfile
+import os, sys, csv, sqlite3, datetime, tempfile
 
 from schoolutils.config import user_config, user_calculators
 from schoolutils.grading import db, validators
@@ -173,6 +173,50 @@ class SimpleUI(BaseUI):
     def grade_formatter(self, grade_row):
         pass
    
+    # BaseUI overrides
+    def initial_database_setup(self):
+        """Set db_file and db_connection from user config and CLI options.
+           Query the user if database does not yet exist."""
+        self.db_file = self.get_config_option('gradedb_file', file_path)
+        if self.db_file:
+            existed = os.path.exists(self.db_file) # existence state before connecting
+            try:
+                self.db_connection = db.connect(self.db_file)
+            except sqlite3.OperationalError:
+                print "WARNING: Unable to open grade database at %s." % self.db_file
+                print "Check the value of gradedb_file in config.py."
+                self.db_connection = None
+
+            if self.db_connection and not existed:
+                # if file didn't exist before but we got a connection,
+                # it's safe to create a new db without prompting
+                print "Initializing new grade database at %s." % self.db_file
+                try:
+                    db.gradedb_init(self.db_connection)
+                except sqlite3.OperationalError:
+                    print ("FAILED to initialize grade database!  "
+                           "Check permissions of database file.")
+                    self.db_connection = None
+            elif self.db_connection:
+                # but if it did exist, test to see that we really have
+                # a grade database
+                # TODO: also double check that db is not open read-only
+                try:
+                    self.db_connection.execute('select id from courses;')
+                except sqlite3.DatabaseError:
+                    print ("WARNING: file at %s does not appear to be a grade database." %
+                           self.db_file)
+                    print "Check the value of gradedb_file in config.py."
+                    self.db_connection = None
+                    
+        if not self.db_connection:
+            print "Could not open a grade database based on your settings in config.py."
+            if typed_input("Enter database path manually? (Y/N) ", yn_bool):
+                self.change_database()
+            else:
+                print "No database connection; exiting."
+                exit(1)
+
     # Actions which can be @require-d: 
     def close_database(self):
         """Close the current database connection."""
