@@ -36,19 +36,59 @@ class GradeDBException(Exception):
         "Print this exception's query and parameter to stderr"
         sys.stderr.write(self.query)
         sys.stderr.write(str(self.params) + '\n')
-    
+
+class ConnectionError(GradeDBException):
+    pass
+
 class NoRecordsFound(GradeDBException):
     pass
 
 class MultipleRecordsFound(GradeDBException):
     pass
 
-def connect(path):
+def connect(path, create=False):
     """Create a connection to a grade database at the given path.
+       If create is True and the database lacks each of the required tables,
+         initializes the database by calling gradedb_init.
        Returns a sqlite3.Connection object appropriately initialized
          for the grading application.
     """
-    conn = sqlite3.connect(path)
+    try:
+        conn = sqlite3.connect(path)
+    except sqlite3.OperationalError as e:
+        raise ConnectionError(e.args[0])
+       
+    try:
+        # test that db has all required tables 
+        expected_tbls = ['students', 'courses', 'course_memberships',
+                         'assignments', 'grades']
+        existing_tbls = [t[0] for t in
+                         conn.execute("SELECT name FROM sqlite_master "
+                                      "WHERE type='table';").fetchall()]
+        missing = [t for t in expected_tbls if t not in existing_tbls]
+
+        if create and len(missing) == len(expected_tbls):
+            # only initialize a new db when none of the tables exist;
+            # any other situation indicates a data integrity problem
+            # the user must resolve manually
+            gradedb_init(conn)
+        elif missing:
+            raise sqlite3.DatabaseError("Missing tables: %s" %
+                                        ", ".join(missing))
+            
+    except sqlite3.DatabaseError as e:
+        conn.close()
+        raise ConnectionError(e.args[0])
+
+    try:
+        # test that db is writeable
+        conn.execute("CREATE TABLE write_test (id INTEGER);")
+        conn.execute("DROP TABLE write_test;")
+        conn.commit()
+    except sqlite3.Error: # DatabaseError or OperationalError
+        conn.close()
+        raise ConnectionError("Database is read-only.")
+ 
     conn.row_factory = sqlite3.Row
 
     return conn
