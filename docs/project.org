@@ -99,10 +99,18 @@ It would be nice for reporting to be this easy:
    No idea if it works, or how, on Windows or other Unixes.  May need
    to revisit in the future.
 ** DONE [#A] Write docs for initial release!				:doc:
-** TODO [#C] Make compatible with Python 3			  :packaging:
-   - actually we are not far off, here
-   - 2to3 reveals that pretty much the only changes that need to be made
-     are for print statements (<2013-01-19 Sat>)
+** INPROGRESS [#C] Make compatible with Python 3		  :packaging:
+   - [X] use print_function
+   - [X] do not use dict.iteritems()
+   - [X] rename cStringIO to io.StringIO
+   - [X] rename raw_input to input
+   - [X] unicode vs. str objects:
+     Note that str objects must be used as keys in 2.x, so we can't just
+     use import unicode_literals.
+     + [X] reporting/reports.py: pass unicode to io.StringIO.write
+   - [ ] bug: getting IndexError in 3.2 in GradeReport.calculate_stats
+     Not sure what the issue is here, yet...possibly due to
+     change in filter()?
 ** DONE [#A] Figure out the best thing to do with user validators     :ui:db:
    useful validators include:
    - sid
