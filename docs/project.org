@@ -111,6 +111,13 @@ It would be nice for reporting to be this easy:
    - [ ] bug: getting IndexError in 3.2 in GradeReport.calculate_stats
      Not sure what the issue is here, yet...possibly due to
      change in filter()?
+   - [-] fix uses of map(), filter()
+     Can probably do this automatically with 2to3:
+     $ 2to3 -f map -f filter ~/src/schoolutils/schoolutils
+     + [X] reports.py
+     + [ ] ui.py
+     + [ ] calculator_helpers.py
+    
 ** DONE [#A] Figure out the best thing to do with user validators     :ui:db:
    useful validators include:
    - sid
