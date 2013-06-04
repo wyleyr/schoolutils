@@ -66,8 +66,7 @@ class GradeReport(Report):
 
         stats = []
         for a in assignments:
-            grades = filter(lambda g: g['assignment_id'] == a['id'],
-                            all_grades)
+            grades = [g for g in all_grades if g['assignment_id'] == a['id']]
             missing = [g['student_id'] for g in grades if g['grade_id'] is None]
             try:
                 mn, mx, avg = self.calculate_stats(grades)
