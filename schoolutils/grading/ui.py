@@ -1339,7 +1339,7 @@ class SimpleUI(BaseUI):
         if not skip:
             skip = []
 
-        for k, v in d.iteritems():
+        for k, v in d.items():
             if k in skip:
                 continue
             

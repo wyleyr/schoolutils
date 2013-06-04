@@ -42,7 +42,7 @@ CONFIG_DEFAULTS = {
 
 def add_defaults(m, defaults):
     "Add default values to a module."
-    for k, v in defaults.iteritems():
+    for k, v in defaults.items():
         if not hasattr(m, k):
             setattr(m, k, v)
 
