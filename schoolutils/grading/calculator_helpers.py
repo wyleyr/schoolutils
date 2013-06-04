@@ -233,7 +233,6 @@ def extract_and_zero_grades(fields, d):
         try:
             g = float(d[f])
         except ValueError:
-            #print "converting to zero: %s" % d[f]
             g = 0.0
         grades.append(g)
 
