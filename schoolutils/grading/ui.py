@@ -21,8 +21,15 @@ User interfaces for grading utilities.
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 # 02110-1301, USA.
 
+# imports to support Python 3
 from __future__ import print_function
 
+try:
+    input = raw_input
+except NameError:
+    pass
+
+# imports compatible across Python versions
 import os, sys, csv, datetime, tempfile
 
 from schoolutils.config import user_config, user_calculators
@@ -1431,7 +1438,7 @@ def typed_input(prompt1, constructor, prompt2=None, default=None):
     val = None
     while val is None:
         try:
-            s = raw_input(prompt)
+            s = input(prompt)
             if not s and default is not None:
                 val = default
             else:
