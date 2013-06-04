@@ -386,15 +386,36 @@ Observed problems:
    - [ ] Tutorial: how to write calculator functions
    - [ ] Document import/export formats
    - [ ] complete API docs? autogenerate from docstrings?
-
+     
+Where to document?  Bitbucket wiki? pythonhosted.org? readthedocs.org?
+Is there a common format that I can use to publish in multiple places?
 ** DONE [#A] enter_grades: Offer to add student to current course	 :ui:
-** TODO [#A] Clarify database setup on first run		     :doc:ui:
+** DONE [#A] Clarify database setup on first run		     :doc:ui:
    - note that user gets to pick location of gradedb_file in README,
      config.py comments
    - deal with first run corner case: user has set gradedb_file, but
      no db exists yet; user should not have to re-type path
      (quick fix: just use the value of gradedb_file as the
      default when prompting for a db location)
+** TODO [#A] Better prompt/header for edit_courses
+Asking user to enter 'course #' is confusing for new users.  Probably
+would be better to go back to using `row #', but keep entity=... for
+selections.
+
+From M. Rieppel:
+> I think the table heading is part of what makes it confusing:
+> 
+>   #: Courses
+> 
+> --------------------------------------------------------------------------------
+>   0: 2: phil2 (Summer 2013)
+> 
+> in the heading, there is just one colon, but in the table itself there are
+> two, so it wasn't clear to me whether the '#' in the header and the
+> instructions referred to the row or the course number.  I think the
+> instructions might be clearer if they said something like "prefix the row #
+> associated with the course with 'e' to edit" etc.
+
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so
