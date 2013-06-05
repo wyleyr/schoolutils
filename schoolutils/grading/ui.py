@@ -476,10 +476,10 @@ class SimpleUI(BaseUI):
         def delete_course(c):
             existing_assignments = db.select_assignments(self.db_connection,
                                                          course_id=c['id'])
-            existing_grades = filter(lambda g: g['value'] is not None,
-                                     db.select_grades_for_course_members(
+            existing_grades = [g for g in db.select_grades_for_course_members(
                                        self.db_connection,
-                                       course_id=c['id']))
+                                       course_id=c['id'])
+                               if g['value'] is not None]
             enrollees = db.select_students(self.db_connection, course_id=c['id'])
             if existing_assignments:
                 print("WARNING: there are %d existing assignments for this course, "
@@ -752,8 +752,7 @@ class SimpleUI(BaseUI):
             course_id=self.course_id)
         rows = [
             {'student': s,
-             'grades': filter(lambda r: r['student_id'] == s['id'],
-                               all_grades)}
+             'grades': [r for r in all_grades if r['student_id'] == s['id']]}
             for s in students]
 
         # we use select_assignments here because it orders the
@@ -865,7 +864,7 @@ class SimpleUI(BaseUI):
             all_courses = db.select_courses(self.db_connection)
             current_courses = db.select_courses(self.db_connection,
                                                 student_id=student['id'])
-            options = filter(lambda c: c not in current_courses, all_courses)
+            options = [c for c in all_courses if c not in current_courses]
             if not options:
                 print("\nThis student is already enrolled in every course.")
                 return None
@@ -990,7 +989,7 @@ class SimpleUI(BaseUI):
             row = {}
             row["Name"] = "%s, %s" % (s['last_name'], s['first_name'])
             row["SID"] = s['sid']
-            grades = filter(lambda row: row['student_id'] == s['id'], all_grades)
+            grades = [r for r in all_grades if r['student_id'] == s['id']]
             for g in grades:
                 assignment_name = g['assignment_name']
                 if assignment_name not in row:
@@ -1099,9 +1098,8 @@ class SimpleUI(BaseUI):
                 course_id=self.course_id)
         
         for s in students:
-            grades = filter(lambda r: (r['student_id'] == s['id'] and
-                                       r['weight'] != 'CALC'),
-                            all_grades)
+            grades = [r for r in all_grades
+                      if (r['student_id'] == s['id'] and r['weight'] != 'CALC')]
 
             try:
                 calculated_grades = calc_func(grades)
