@@ -104,14 +104,14 @@ def number_to_letter(n, scale):
 # Aggregations and averages:   
 def letter_grade_min(letter_grades):
     """Returns minimum grade in a list of letter grades."""
-    pts = map(letter_to_points, letter_grades)
+    pts = list(map(letter_to_points, letter_grades))
     mn = min(pts)
     i = pts.index(mn)
     return letter_grades[i]
 
 def letter_grade_max(letter_grades):
     """Returns maximum grade in a list of letter grades."""
-    pts = map(letter_to_points, letter_grades)
+    pts = list(map(letter_to_points, letter_grades))
     mx = max(pts)
     i = pts.index(mx)
     return letter_grades[i]
@@ -123,7 +123,7 @@ def letter_grade_average(letter_grades, weights=None, filter_nan=False):
     if filter_nan:
         letter_grades = remove_none_and_nan(letter_grades)
         
-    point_grades = map(letter_to_points, letter_grades)
+    point_grades = list(map(letter_to_points, letter_grades))
 
     if weights:
         return weighted_average(point_grades, weights)
@@ -180,7 +180,7 @@ def calculation_for_type(grades, grade_type, numeric_func,
             return letter_func(grades)
         else:
             conversion = lambda g: letter_to_number(g, scale)
-            return numeric_func(map(conversion, grades))
+            return numeric_func(list(map(conversion, grades)))
     else:
         raise ValueError("Unknown grade type: %s" % grade_type)
        
@@ -240,6 +240,6 @@ def extract_and_zero_grades(fields, d):
 
 def remove_none_and_nan(values):
     "Filter values to remove None and NaN"
-    return filter(lambda v: (v is not None and
-                             (not math.isnan(v) if type(v) is float else True)),
-                  values)
+    return [v for v in values
+            if (v is not None and
+                (not math.isnan(v) if type(v) is float else True))]
