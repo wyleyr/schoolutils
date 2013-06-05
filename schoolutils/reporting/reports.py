@@ -21,7 +21,14 @@ Basic report definitions.
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 # 02110-1301, USA.
 
-import math, cStringIO
+import math, io
+
+# support io.StringIO.write requiring unicode in Python 3
+def u(s):
+    try:
+        return unicode(s)
+    except NameError:
+        return s
 
 from schoolutils.grading import db, calculator_helpers as ch
 
@@ -59,8 +66,7 @@ class GradeReport(Report):
 
         stats = []
         for a in assignments:
-            grades = filter(lambda g: g['assignment_id'] == a['id'],
-                            all_grades)
+            grades = [g for g in all_grades if g['assignment_id'] == a['id']]
             missing = [g['student_id'] for g in grades if g['grade_id'] is None]
             try:
                 mn, mx, avg = self.calculate_stats(grades)
@@ -123,24 +129,24 @@ class GradeReport(Report):
                                      num_missing="Missing grades")
         underline = "".join('-' for i in range(len(header))) + "\n"
         
-        output = cStringIO.StringIO()
+        output = io.StringIO()
 
         course = db.select_courses(self.db_connection, course_id=self.course_id)[0]
-        output.write(title_template.format(**course))
-        output.write(header)
-        output.write(underline)
+        output.write(u(title_template.format(**course)))
+        output.write(u(header))
+        output.write(u(underline))
 
         for s in self.stats:
             num_missing = len(s['missing_students'])
             if 'unavailable' in s:
-                output.write(row_template.format(
+                output.write(u(row_template.format(
                         assignment_name=s['assignment_name'],
                         weight=s['weight'],
                         min=None, max=None, mean=None,
-                        num_missing=num_missing))
+                        num_missing=num_missing)))
                 continue
             
-            output.write(row_template.format(num_missing=num_missing, **s))
+            output.write(u(row_template.format(num_missing=num_missing, **s)))
             
         return output.getvalue()
        
@@ -158,28 +164,28 @@ class GradeReport(Report):
                             "assignment:\n{student_names}\n")
         name_template = "{last_name}, {first_name} (SID: {sid})"
         
-        output = cStringIO.StringIO()
+        output = io.StringIO()
 
         course = db.select_courses(self.db_connection, course_id=self.course_id)[0]
-        output.write(title_template.format(**course))
+        output.write(u(title_template.format(**course)))
 
         for s in self.stats:
             if 'unavailable' in s:
-                output.write(no_stats_msg.format(**s))
+                output.write(u(no_stats_msg.format(**s)))
                 continue
                         
-            output.write(stats_template.format(**s))
+            output.write(u(stats_template.format(**s)))
             if s['missing_students']:
                 students = db.select_students(self.db_connection,
                                               course_id=self.course_id)
                 names = "\n".join(name_template.format(**stu)
                                   for stu in students
                                   if stu['id'] in s['missing_students'])
-                output.write(missing_template.format(
+                output.write(u(missing_template.format(
                         num_missing=len(s['missing_students']),
-                        student_names=names))
+                        student_names=names)))
 
-            output.write('\n') # empty line between assignments
+            output.write(u('\n')) # empty line between assignments
 
         return output.getvalue()
     
