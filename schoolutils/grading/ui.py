@@ -1140,7 +1140,13 @@ class SimpleUI(BaseUI):
                                        course_id=self.course_id)[0]
             name = "grade_report_{number}_{semester}_{year}-".format(**course)
             with tempfile.NamedTemporaryFile(prefix=name, delete=False) as t:
-                t.write(full_report)
+                try:
+                    # 3.x
+                    report_bytes = full_report.encode("utf-8")
+                except AttributeError:
+                    # 2.x
+                    report_bytes = full_report
+                t.write(report_bytes)
                 print("Full report saved at: %s\n" % t.name)
 
     def exit(self):
