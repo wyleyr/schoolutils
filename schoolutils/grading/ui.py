@@ -645,9 +645,9 @@ class SimpleUI(BaseUI):
                             course=self.course_formatter(course)))
                     # offer to add to course, but don't refuse to continue if not
                     if typed_input("Add this student to the course? (Y/N) ", yn_bool):
-                       db.create_course_member(self.db_connection,
-                                               student_id=student['id'],
-                                               course_id=self.course_id)
+                        db.create_course_member(self.db_connection,
+                                                student_id=student['id'],
+                                                course_id=self.course_id)
                     else:
                         print("WARNING: grades for this student will not be "
                               "calculated or reported unless you add him or her "
