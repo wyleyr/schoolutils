@@ -108,15 +108,16 @@ It would be nice for reporting to be this easy:
      Note that str objects must be used as keys in 2.x, so we can't just
      use import unicode_literals.
      + [X] reporting/reports.py: pass unicode to io.StringIO.write
-   - [ ] bug: getting IndexError in 3.2 in GradeReport.calculate_stats
+   - [X] bug: getting IndexError in 3.2 in GradeReport.calculate_stats
      Not sure what the issue is here, yet...possibly due to
      change in filter()?
-   - [-] fix uses of map(), filter()
+   - [X] fix uses of map(), filter()
      Can probably do this automatically with 2to3:
      $ 2to3 -f map -f filter ~/src/schoolutils/schoolutils
      + [X] reports.py
-     + [ ] ui.py
-     + [ ] calculator_helpers.py
+     + [X] ui.py
+     + [X] calculator_helpers.py
+   - [ ] fix uses of zip()
     
 ** DONE [#A] Figure out the best thing to do with user validators     :ui:db:
    useful validators include:
