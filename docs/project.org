@@ -431,7 +431,12 @@ From M. Rieppel:
 > instructions referred to the row or the course number.  I think the
 > instructions might be clearer if they said something like "prefix the row #
 > associated with the course with 'e' to edit" etc.
-
+** TODO [#B] Simple histogram on grade report		       :reporting:ui:
+print a "|" for each grade level in current assignment? if letter
+grades?
+** TODO [#B] Automatic selection of current assignment		  :grader:ui:
+If multiple assignments exist for the current course, select the one
+that was most recently due?
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so

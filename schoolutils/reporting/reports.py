@@ -108,6 +108,12 @@ class GradeReport(Report):
        
         return mn, mx, avg
 
+    def histogram(self, grades):
+        """Produce a simple text histogram indicating an assignment's distribution of grades.
+           CURRENTLY ONLY IMPLEMENTED FOR ASSIGNMENTS WITH LETTER GRADE TYPE."""
+        values, weights, types, _ = ch.unpack_entered_grades(grades)
+        raise NotImplementedError
+    
     def as_text(self, compact=False):
         """Return a textual representation of this report as a string.
            If compact is True, returns a compact, tabular representation.
