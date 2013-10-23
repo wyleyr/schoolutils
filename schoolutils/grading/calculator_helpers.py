@@ -200,6 +200,34 @@ def mean_for_type(values, grade_type, filter_nan=False):
                                 letter_func=letter_grade_average,
                                 filter_nan=filter_nan)
 
+def freqs_for_letters(values):
+    """Returns frequencies for a list of letter grade values.
+       Frequencies are represented as a dictionary mapping letter grade strings to
+       integers."""
+    freqs = dict((p[0], 0) for p in POINTS) # ensure we get all grade values 
+    for v in values:
+        freqs[v] += 1
+    return freqs
+
+def freqs_for_numbers(values, bins):
+    """Returns frequencies for a list of numeric grade values.
+       Values are binned according to the ranges defined by the bins:
+         each item in bins should be a tuple t such that
+          t[0] is an exclusive max, and
+          t[1] is an inclusive min
+         defining the range for a bin.
+       Frequencies are represented as a dictionary mapping bins to integers."""
+    freqs = dict((b, 0) for b in bins)
+    for v in values:
+        for b in bins:
+            if b[0] > v >= b[1]:
+                freqs[b] += 1
+                break
+        else:
+            raise ValueError("Value %s did not fit in any bin!" % v)
+
+    return freqs
+
 # Munging input data:
 def unpack_entered_grades(rows):
     """Extract grade values, weights, types and assignment names from a sequence

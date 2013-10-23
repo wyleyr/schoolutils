@@ -70,6 +70,7 @@ class GradeReport(Report):
             missing = [g['student_id'] for g in grades if g['grade_id'] is None]
             try:
                 mn, mx, avg = self.calculate_stats(grades)
+                hist = self.histogram(grades)
                 stats.append({
                         'assignment_id': a['id'],
                         'assignment_name': a['name'],
@@ -78,6 +79,7 @@ class GradeReport(Report):
                         'min': mn,
                         'max': mx,
                         'mean': avg,
+                        'hist': hist,
                         'missing_students': missing,
                         })
             except (ValueError, TypeError) as e:
@@ -103,16 +105,42 @@ class GradeReport(Report):
         if math.isnan(avg):
             avg = None
         if avg and grade_type == 'letter':
-            # letter grade is more useful here
+            # knowing letter grade is more useful here
             avg = ch.points_to_letter(avg)
        
         return mn, mx, avg
 
     def histogram(self, grades):
-        """Produce a simple text histogram indicating an assignment's distribution of grades.
-           CURRENTLY ONLY IMPLEMENTED FOR ASSIGNMENTS WITH LETTER GRADE TYPE."""
+        "Produce a simple text histogram indicating an assignment's distribution of grades."
         values, weights, types, _ = ch.unpack_entered_grades(grades)
-        raise NotImplementedError
+
+        if types[0] == 'letter': # values are for single assignment and grade type
+            bins = [p[0] for p in ch.POINTS] # grade values in descending order
+            freqs = ch.freqs_for_letters(values)
+        else:
+            if types[0] == '4points':
+                scale = ch.POINTS
+            elif types[0] == 'percent':
+                scale = ch.PERCENTS
+            else:
+                raise ValueError("Can't calculate histogram bins for assignment type %s" %
+                                 types[0])
+            bins = [p[2], p[3] for p in scale]
+            bins.pop(-1) # remove "dummy" limits bin with inf/-inf bounds 
+            freqs = ch.freqs_for_numbers(values, bins)
+
+        def bin_str(b):
+            if isinstance(b, tuple):
+                return "{1:<.2f} to {0:<.2f}".format(*b)
+            else:
+                return b # letter grade "bins" are already strings
+            
+        line_template = "{bin: >10}: {bars}\n"
+        lines = [line_template.format(bin=bin_str(b),
+                                      bars="".join("|" for i in range(freqs[b])))
+                 for b in bins] # ensure grade values are printed in order
+
+        return "".join(lines)
     
     def as_text(self, compact=False):
         """Return a textual representation of this report as a string.
@@ -163,7 +191,8 @@ class GradeReport(Report):
         stats_template = ("{assignment_name: <25s}\n"
                           "Grade type: {grade_type: <8s} Weight: {weight: <8}\n"
                           "Average: {mean: <8} Minimum: {min: <8} "
-                          "Maximum: {max: <8}\n")
+                          "Maximum: {max: <8}\n"
+                          "Distribution:\n{hist}\n")
         no_stats_msg = ("{assignment_name: <25s}\n  No statistics available for "
                         "this assignment, because:\n  {unavailable}\n")
         missing_template = ("{num_missing} students do not have a grade for this "
