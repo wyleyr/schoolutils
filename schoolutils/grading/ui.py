@@ -161,7 +161,7 @@ class SimpleUI(BaseUI):
     """
     # Helpers for printing data to stdout
     STUDENT_FORMAT = '{last_name}, {first_name} (SID: {sid})'
-    COURSE_FORMAT = '{number}: {name} ({semester} {year})'
+    COURSE_FORMAT = '{number} - {name} ({semester} {year})'
     ASSIGNMENT_FORMAT = '{name} (due {due_date})'
     GRADE_FORMAT = '' # TODO
 
@@ -767,7 +767,8 @@ class SimpleUI(BaseUI):
         header = row_fmt.format(name="Student",
                                 **dict((a,a) for a in assignment_names))
     
-        self.edit_table(rows, header, formatter, editor=editor)
+        self.edit_table(rows, header, formatter, editor=editor,
+                        entity_type='grades for student')
         print("Grades updated successfully.")
 
     @require('db_connection', change_database,
@@ -938,7 +939,8 @@ class SimpleUI(BaseUI):
             "Current students in %s" % self.course_formatter(current_course),
             self.student_formatter,
             creator=add_to_course,
-            deleter=remove_from_course)
+            deleter=remove_from_course,
+            entity_type="student's membership")
         print("Course enrollments updated.")
  
     def import_grades(self):
@@ -1264,7 +1266,7 @@ class SimpleUI(BaseUI):
         """
         editable_rows = [r for r in rows]
         header_underline = "-".ljust(80, "-")
-        row_format = "{index: >3}: {frow: <75s}"
+        row_format = "{index: >5}: {frow: <73s}"
         def validator(s):
             s = s.strip().lower()
             if s.startswith('d'):
@@ -1284,7 +1286,7 @@ class SimpleUI(BaseUI):
         while True:
             try:
                 print("")
-                print(row_format.format(index='#', frow=header))
+                print(row_format.format(index='Row #', frow=header))
                 print(header_underline)
                 if editable_rows:
                     for i, r in enumerate(editable_rows):
@@ -1297,12 +1299,12 @@ class SimpleUI(BaseUI):
                 if creator:
                     prompt += "Enter 'c' to create a new %s. " % entity_type
                 if editor:
-                    prompt += "Prefix %s # with 'e' to edit. " % entity_type
+                    prompt += "Prefix row # with 'e' to edit %s. " % entity_type
                 if deleter:
-                    prompt += "Prefix %s # with 'd' to delete. " % entity_type
+                    prompt += "Prefix row # with 'd' to delete %s. " % entity_type
                 if selector:
-                    prompt += ("\nEnter %s # to select as current %s. " %
-                               (entity_type, entity_type))
+                    prompt += ("\nEnter row # to select as current %s. " %
+                               entity_type)
                 prompt += "\nWhat do you want to do? "
                     
                 action, idx = typed_input(prompt, validator)
