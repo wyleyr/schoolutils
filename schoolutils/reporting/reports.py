@@ -125,7 +125,7 @@ class GradeReport(Report):
             else:
                 raise ValueError("Can't calculate histogram bins for assignment type %s" %
                                  types[0])
-            bins = [p[2], p[3] for p in scale]
+            bins = [(p[2], p[3]) for p in scale]
             bins.pop(-1) # remove "dummy" limits bin with inf/-inf bounds 
             freqs = ch.freqs_for_numbers(values, bins)
 
