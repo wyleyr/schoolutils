@@ -413,7 +413,7 @@ Is there a common format that I can use to publish in multiple places?
      no db exists yet; user should not have to re-type path
      (quick fix: just use the value of gradedb_file as the
      default when prompting for a db location)
-** TODO [#A] Better prompt/header for edit_courses
+** DONE [#A] Better prompt/header for edit_courses
 Asking user to enter 'course #' is confusing for new users.  Probably
 would be better to go back to using `row #', but keep entity=... for
 selections.
@@ -431,7 +431,13 @@ From M. Rieppel:
 > instructions referred to the row or the course number.  I think the
 > instructions might be clearer if they said something like "prefix the row #
 > associated with the course with 'e' to edit" etc.
-** TODO [#B] Simple histogram on grade report		       :reporting:ui:
+
+Solution here:
+  1) change course_formatter to use "-" rather than ":" between course
+     number and name
+  2) change prompt text in edit_table to make it clear that we want
+     the ROW #, not the course number
+** DONE [#B] Simple histogram on grade report		       :reporting:ui:
 print a "|" for each grade level in current assignment? if letter
 grades?
 ** TODO [#B] Automatic selection of current assignment		  :grader:ui:
