@@ -206,7 +206,8 @@ def freqs_for_letters(values):
        integers."""
     freqs = dict((p[0], 0) for p in POINTS) # ensure we get all grade values 
     for v in values:
-        freqs[v] += 1
+        if v in freqs:
+            freqs[v] += 1
     return freqs
 
 def freqs_for_numbers(values, bins):
