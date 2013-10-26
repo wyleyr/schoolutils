@@ -69,7 +69,7 @@ class GradeReport(Report):
             grades = [g for g in all_grades if g['assignment_id'] == a['id']]
             missing = [g['student_id'] for g in grades if g['grade_id'] is None]
             try:
-                mn, mx, avg = self.calculate_stats(grades)
+                mn, mx, avg, lavg = self.calculate_stats(grades)
                 hist = self.histogram(grades)
                 stats.append({
                         'assignment_id': a['id'],
@@ -79,6 +79,7 @@ class GradeReport(Report):
                         'min': mn,
                         'max': mx,
                         'mean': avg,
+                        'mean_as_letter': lavg,
                         'hist': hist,
                         'missing_students': missing,
                         })
@@ -96,19 +97,25 @@ class GradeReport(Report):
         return stats
 
     def calculate_stats(self, grades):
-        "Calculate summary statistics for the grades for a particular assignment"
+        """Calculate summary statistics for the grades for a particular assignment.
+           Returns minimum, maximum, mean, and mean converted to a letter grade
+           for a set of grades.
+        """
         values, weights, types, _ = ch.unpack_entered_grades(grades)
         grade_type = types[0] # values are for single assignment and grade type
         mn = ch.min_for_type(values, grade_type)
         mx = ch.max_for_type(values, grade_type)
         avg = ch.mean_for_type(values, grade_type, filter_nan=True)
+        letter_avg = None
         if math.isnan(avg):
             avg = None
-        if avg and grade_type == 'letter':
-            # knowing letter grade is more useful here
-            avg = ch.points_to_letter(avg)
+        if avg:
+            if grade_type == '4points' or grade_type == 'letter':
+                letter_avg = ch.points_to_letter(avg)
+            elif grade_type == 'percentage':
+                letter_avg = ch.percentage_to_letter(avg)
        
-        return mn, mx, avg
+        return mn, mx, avg, letter_avg
 
     def histogram(self, grades):
         "Produce a simple text histogram indicating an assignment's distribution of grades."
@@ -155,10 +162,10 @@ class GradeReport(Report):
     def as_compact_text(self):
         "Return a compact, tabular representation of this report."
         title_template = "GRADE REPORT: {number}: {name}, {semester} {year}\n"
-        row_template = ("{assignment_name: <15} {weight: <10} {mean: <10} {min: <10}"
-                        "{max: <10} {num_missing: <15}\n")
+        row_template = ("{assignment_name: <15} {weight: <10} {mean: <5.4} {mean_as_letter: <5}"
+                        "{min: <10} {max: <10} {num_missing: <15}\n")
         header = row_template.format(assignment_name="Assignment", weight="Weight",
-                                     mean="Average",
+                                     mean="Mean", mean_as_letter="",
                                      min="Minimum", max="Maximum",
                                      num_missing="Missing grades")
         underline = "".join('-' for i in range(len(header))) + "\n"
@@ -172,15 +179,22 @@ class GradeReport(Report):
 
         for s in self.stats:
             num_missing = len(s['missing_students'])
+            row = "\n"
             if 'unavailable' in s:
-                output.write(u(row_template.format(
+                row = u(row_template.format(
                         assignment_name=s['assignment_name'],
                         weight=s['weight'],
                         min=None, max=None, mean=None,
-                        num_missing=num_missing)))
-                continue
-            
-            output.write(u(row_template.format(num_missing=num_missing, **s)))
+                        num_missing=num_missing))
+            else:
+                row = u(row_template.format(
+                        assignment_name=s['assignment_name'],
+                        weight=s['weight'],
+                        min=s['min'], max=s['max'], mean=s['mean'],
+                        mean_as_letter=("({0})".format(s['mean_as_letter'])
+                                        if s['mean_as_letter'] else ""),
+                        num_missing=num_missing))
+            output.write(row)
             
         return output.getvalue()
        
