@@ -184,7 +184,7 @@ class GradeReport(Report):
                 row = u(row_template.format(
                         assignment_name=s['assignment_name'],
                         weight=s['weight'],
-                        min=None, max=None, mean=None,
+                        min=None, max=None, mean=None, mean_as_letter=None,
                         num_missing=num_missing))
             else:
                 row = u(row_template.format(
