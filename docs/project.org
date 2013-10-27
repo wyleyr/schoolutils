@@ -440,7 +440,7 @@ Solution here:
 ** DONE [#B] Simple histogram on grade report		       :reporting:ui:
 print a "|" for each grade level in current assignment? if letter
 grades?
-** TODO [#B] Automatic selection of current assignment		  :grader:ui:
+** DONE [#B] Automatic selection of current assignment		  :grader:ui:
 If multiple assignments exist for the current course, select the one
 that was most recently due?
 * Bug notes
