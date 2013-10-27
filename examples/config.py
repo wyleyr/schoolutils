@@ -55,7 +55,8 @@ current_courses = ['146',]  # list of strings
 # current course when you start the grading program
 default_course = current_courses[0]
 
-# If you specify default_assignment as a string in addition to
-# default_course, it will be selected as the current assignment when
-# you start the grading program
-#default_assignment = "Paper 1"
+# If you set use_last_due_assignment to True, and you specify a
+# default_course above, then the most recently due assignment for that
+# course will be selected as the current assignment when you start the
+# grading program and whenever you change the current course
+use_last_due_assignment = True

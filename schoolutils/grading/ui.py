@@ -141,20 +141,16 @@ class BaseUI(object):
             
     def initial_assignment_setup(self):
         "Set assignment_id using user config and CLI options"
-        assignment_name = self.get_config_option('default_assignment',
-                                                 validators.assignment_name)
-        if not (self.db_connection and self.course_id and assignment_name):
+        if not (self.db_connection and self.course_id):
             return
-        
-        try:
-            self.assignment_id = db.ensure_unique(
-                db.select_assignments(self.db_connection,
-                                      course_id=self.course_id,
-                                      name=assignment_name))
-        except (db.NoRecordsFound, db.MultipleRecordsFound):
-            sys.stderr.write("Unable to locate a unique default assignment; "
-                             "ignoring.\n")
-        
+
+        if user_config.use_last_due_assignment:
+            try:
+                self.select_last_due_assignment()
+            except AttributeError: # select_last_due_assignment is currently defined by SimpleUI
+                sys.stderr.write("Ignoring use_last_due_assignment.\n")
+
+       
 
 class SimpleUI(BaseUI):
     """Manages a simple (command line) user interface.
@@ -457,17 +453,31 @@ class SimpleUI(BaseUI):
                 if not typed_input("Delete anyway? (Y/N) ", yn_bool):
                     return False
 
-            # deselect if this assignment was the currently selected assignment
+            # deselect if this course was the currently selected course
             if self.course_id == c['id']:
                 self.course_id = None
+            if self.assignment_id in existing_assignments:
+                self.assignment_id = None
                 
             return db.delete_course_etc(self.db_connection,
                                         course_id=c['id'])
 
         def select_course(c):
-            self.course_id = c['id']
-            print("Selected course %s as current course.\n"
-                  % self.course_formatter(c))
+            if self.course_id != c['id']:
+                self.course_id = c['id']
+                self.assignment_id = None
+                print("Selected %s as current course."
+                      % self.course_formatter(c))
+            if user_config.use_last_due_assignment:
+                self.select_last_due_assignment()
+                if self.assignment_id:
+                    assignment = db.select_assignments(
+                        self.db_connection,
+                        assignment_id=self.assignment_id)[0]
+                    print("Selected %s as current assignment." %
+                          self.assignment_formatter(assignment))
+
+            print("")   
             return True
         
         formatter = self.course_formatter
@@ -559,7 +569,7 @@ class SimpleUI(BaseUI):
 
         def select_assignment(a):
             self.assignment_id = a['id']
-            print("Selected assignment %s as current assignment.\n"
+            print("Selected %s as current assignment.\n"
                   % self.assignment_formatter(a))
             return True
         
@@ -579,6 +589,39 @@ class SimpleUI(BaseUI):
                         deleter=delete_assignment,
                         selector=select_assignment)
         
+    @require('db_connection', change_database,
+             "A database connection is required to select last due assignment.")
+    @require('course_id', edit_courses,
+             "A selected course is required to select last due assignment.")
+    def select_last_due_assignment(self):
+        """Select last due assignment.
+           Selects the most recently due assignment in the current course, if any.
+        """
+        assignments = db.select_assignments(self.db_connection,
+                                            course_id=self.course_id)
+        most_recent = None
+        current_date = datetime.date.today()
+        past_assignments = [a for a in assignments
+                            if a['due_date'] and
+                               validators.date(a['due_date']) <= current_date]
+
+        if not past_assignments:
+            print("No assignments for this course have a due date in "
+                  "the past; no current assignment is set.\n")
+            self.assignment_id = None
+            return
+   
+        most_recent = past_assignments[0] 
+        most_recent_date = validators.date(most_recent['due_date'])
+        for a in past_assignments:
+            due_date = validators.date(a['due_date'])
+            if due_date > most_recent_date:
+                most_recent = a
+                most_recent_date = due_date
+
+        self.assignment_id = most_recent['id']
+
+           
     @require('db_connection', change_database,
              "A database connection is required to enter grades.")
     @require('course_id', edit_courses,
