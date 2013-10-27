@@ -37,7 +37,7 @@ CONFIG_DEFAULTS = {
     'current_year': datetime.date.today().year,
     'current_courses': [],
     'default_course': '', 
-    'default_assignment': '',
+    'use_last_due_assignment': False,
 }
 
 def add_defaults(m, defaults):
