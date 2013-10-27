@@ -142,9 +142,10 @@ class GradeReport(Report):
             else:
                 return b # letter grade "bins" are already strings
             
-        line_template = "{bin: >10}: {bars}\n"
+        line_template = "{bin: >10}: {freq: <5} {bars}\n"
         lines = [line_template.format(bin=bin_str(b),
-                                      bars="".join("|" for i in range(freqs[b])))
+                                      bars="".join("|" for i in range(freqs[b])),
+                                      freq=("({0})".format(freqs[b]) if freqs[b] else ""))
                  for b in bins] # ensure grade values are printed in order
 
         return "".join(lines)
@@ -162,7 +163,7 @@ class GradeReport(Report):
     def as_compact_text(self):
         "Return a compact, tabular representation of this report."
         title_template = "GRADE REPORT: {number}: {name}, {semester} {year}\n"
-        row_template = ("{assignment_name: <15} {weight: <10} {mean: <5.4} {mean_as_letter: <5}"
+        row_template = ("{assignment_name: <25} {weight: <10} {mean: <5.4} {mean_as_letter: <5}"
                         "{min: <10} {max: <10} {num_missing: <15}\n")
         header = row_template.format(assignment_name="Assignment", weight="Weight",
                                      mean="Mean", mean_as_letter="",
