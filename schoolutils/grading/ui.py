@@ -399,39 +399,6 @@ class SimpleUI(BaseUI):
 
            
     @require('db_connection', change_database,
-             "A database connection is required to select a course.")
-    def select_course(self):
-        """Select an existing course.
-           Lookup an existing course in the database by semester, name, or number.
-        """
-        print("(Press Enter to skip a given search criterion)")
-        year = typed_input("Enter year: ", validators.year, default='') 
-        semester = typed_input("Enter semester: ", validators.semester,
-                               default='') 
-        course_num = typed_input("Enter course number: ",
-                                 validators.course_number) 
-        course_name = typed_input("Enter course name: ", validators.course_name)
-
-        courses = db.select_courses(self.db_connection,
-                                    year=year, semester=semester,
-                                    name=course_name, number=course_num)
-                                   
-        if len(courses) == 1:
-            course = courses[0]
-            print("Found 1 course; selecting: %s" % self.course_formatter(course))
-            self.course_id = course['id']
-        elif len(courses) == 0:
-            print("No courses found matching those criteria; please try again.")
-            return self.change_course()
-        else:
-            course = self.options_menu(
-                "Multiple courses found; please select one:",
-                courses, self.course_formatter, allow_none=True)
-            if course:
-                print("Selected: %s" % self.course_formatter(course))
-                self.course_id = course['id']
-
-    @require('db_connection', change_database,
              "A database connection is required to edit courses.")
     def edit_courses(self):
         """Edit courses.
