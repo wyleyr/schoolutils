@@ -443,6 +443,11 @@ grades?
 ** DONE [#B] Automatic selection of current assignment		  :grader:ui:
 If multiple assignments exist for the current course, select the one
 that was most recently due?
+** TODO [#A] Correct `points' ambiguity in calculator_helpers.py	 :ui:
+   Right now, functions dealing with 4.0-scale grades use `points' in
+   their names, which is inconsistent with the grader's use of
+   `points' as a type for grades which have a number of possible
+   points.  Change to `fourpoints'?
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so
