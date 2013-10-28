@@ -40,14 +40,14 @@ Sample validators file for schoolutils
 # Here is an example validator function:
 def sid(s):
     """Ensure s is a valid UC Berkeley SID"""
-    sid = s.strip()
-    if len(sid) != 8:
+    student_sid = s.strip()
+    if len(student_sid) != 8:
         raise ValueError("SID must be 8 digits long")
-    for digit in sid:
+    for digit in student_sid:
         if digit not in '0123456789':
             raise ValueError("Non-numeric digit in SID: %s" % digit)
     else:
-        return sid
+        return student_sid
 
 
 # The complete list of validators you can override is as follows:
