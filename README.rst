@@ -178,8 +178,12 @@ Validator function
    that any string passed to it is a letter grade, so that you can't
    save a letter grade of 'W' by mistake.
 
-   See the sample ``validators.py`` module for more information and a
-   list of the validators you can define.
+   schoolutils provides sensible defaults for all validator functions,
+   so defining your own is not strictly necessary.  But you can reduce
+   data-entry errors by providing custom validator functions, which
+   will override the defaults.  See the sample ``validators.py``
+   module for more information and a list of the validators for which
+   you can provide custom definitions.
 
 
 Command-line options

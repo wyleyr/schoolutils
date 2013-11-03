@@ -37,12 +37,12 @@ CONFIG_DEFAULTS = {
     'current_year': datetime.date.today().year,
     'current_courses': [],
     'default_course': '', 
-    'default_assignment': '',
+    'use_last_due_assignment': False,
 }
 
 def add_defaults(m, defaults):
     "Add default values to a module."
-    for k, v in defaults.iteritems():
+    for k, v in defaults.items():
         if not hasattr(m, k):
             setattr(m, k, v)
 

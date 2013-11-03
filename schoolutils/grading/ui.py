@@ -21,6 +21,15 @@ User interfaces for grading utilities.
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 # 02110-1301, USA.
 
+# imports to support Python 3
+from __future__ import print_function
+
+try:
+    input = raw_input
+except NameError:
+    pass
+
+# imports compatible across Python versions
 import os, sys, csv, datetime, tempfile
 
 from schoolutils.config import user_config, user_calculators
@@ -42,8 +51,8 @@ def require(attribute, callback, message):
         def method(self, *args, **kwargs):
             attr = getattr(self, attribute, None)
             while not attr:
-                print ""
-                print message
+                print("")
+                print(message)
                 callback(self)
                 attr = getattr(self, attribute, None)
             return f(self, *args, **kwargs)
@@ -95,7 +104,10 @@ class BaseUI(object):
         "Set db_file and db_connection from user config and CLI options"
         self.db_file = self.get_config_option('gradedb_file', file_path)
         if self.db_file and os.path.exists(self.db_file):
-            self.db_connection = db.connect(self.db_file)
+            try:
+                self.db_connection = db.connect(self.db_file, create=False)
+            except db.ConnectionError:
+                self.db_connection = None
         else:
             self.db_connection = None
 
@@ -129,27 +141,23 @@ class BaseUI(object):
             
     def initial_assignment_setup(self):
         "Set assignment_id using user config and CLI options"
-        assignment_name = self.get_config_option('default_assignment',
-                                                 validators.assignment_name)
-        if not (self.db_connection and self.course_id and assignment_name):
+        if not (self.db_connection and self.course_id):
             return
-        
-        try:
-            self.assignment_id = db.ensure_unique(
-                db.select_assignments(self.db_connection,
-                                      course_id=self.course_id,
-                                      name=assignment_name))
-        except (db.NoRecordsFound, db.MultipleRecordsFound):
-            sys.stderr.write("Unable to locate a unique default assignment; "
-                             "ignoring.\n")
-        
+
+        if user_config.use_last_due_assignment:
+            try:
+                self.select_last_due_assignment()
+            except AttributeError: # select_last_due_assignment is currently defined by SimpleUI
+                sys.stderr.write("Ignoring use_last_due_assignment.\n")
+
+       
 
 class SimpleUI(BaseUI):
     """Manages a simple (command line) user interface.
     """
     # Helpers for printing data to stdout
     STUDENT_FORMAT = '{last_name}, {first_name} (SID: {sid})'
-    COURSE_FORMAT = '{number}: {name} ({semester} {year})'
+    COURSE_FORMAT = '{number} - {name} ({semester} {year})'
     ASSIGNMENT_FORMAT = '{name} (due {due_date})'
     GRADE_FORMAT = '' # TODO
 
@@ -173,11 +181,52 @@ class SimpleUI(BaseUI):
     def grade_formatter(self, grade_row):
         pass
    
+    # BaseUI overrides
+    def initial_database_setup(self):
+        """Set db_file and db_connection from user config and CLI options.
+           Query the user if automatic database connection fails."""
+        super(SimpleUI, self).initial_database_setup()
+        if self.db_connection:
+            return
+        if not self.db_file:
+            return self.change_database()
+
+        err_msg = ''
+        if not os.path.exists(self.db_file):
+            prompt = "No existing database at %s.\nCreate? (Y/N) " % self.db_file
+            if typed_input(prompt, yn_bool):
+                try:
+                    self.db_connection = db.connect(self.db_file, create=True)
+                except db.ConnectionError as e:
+                    err_msg = ("FAILED to create database at {path}.\n"
+                               "Error was: {err}".format(path=self.db_file, err=e))
+        else:
+            # retry automatic connection, mostly to get error message
+            try:
+                self.db_connection = db.connect(self.db_file, create=False)
+            except db.ConnectionError as e:
+                err_msg = ("FAILED to open file at {path} as a grade database.\n"
+                           "Error was: {err}".format(path=self.db_file, err=e))
+                    
+        if not self.db_connection:
+            if err_msg:
+                print(err_msg)
+            print("Could not open a grade database based on your settings "
+                  "in config.py.\n"
+                  "Check the value of your gradedb_file setting and "
+                  "permissions of your database \nfile and enclosing directory.")
+            if typed_input("Enter database path manually? (Y/N) ", yn_bool):
+                return self.change_database()
+            else:
+                # setup attempts failed, but we can still let the user
+                # go to the main menu
+                self.db_connection = None
+                
     # Actions which can be @require-d: 
     def close_database(self):
         """Close the current database connection."""
         if self.db_connection:
-            print "Closing current database located at: %s" % self.db_file
+            print("Closing current database located at: %s" % self.db_file)
             self.db_connection.commit()
             self.db_connection.close()
             self.db_connection = None
@@ -194,20 +243,23 @@ class SimpleUI(BaseUI):
             self.close_database()
         
         db_path = typed_input("Enter path to grade database: ", file_path)
+        create = False
         if not os.path.exists(db_path):
             create = typed_input(
-                "No existing database at %s.  Create (Y/N)? " % db_path,
+                "No existing database at %s.\nCreate (Y/N)? " % db_path,
                 yn_bool)
-            if create:
-                self.db_file = db_path
-                self.db_connection = db.connect(db_path)
-                db.gradedb_init(self.db_connection)
-            else:
-                return None
-        else:
+        try:
             self.db_file = db_path
-            self.db_connection = db.connect(db_path)
-
+            self.db_connection = db.connect(db_path, create=create)
+        except db.ConnectionError as e:
+            print("Could not open {path} as a grade database.\n"
+                  "Error was: {err}".format(path=db_path, err=e))
+            
+            if typed_input("Try again? (Y/N) ", yn_bool):
+                return self.change_database()
+            else:
+                print("Database change aborted.")
+            
             
     def get_student(self, create=False):
         """Lookup a student in the database, trying several methods.
@@ -231,7 +283,7 @@ class SimpleUI(BaseUI):
             if len(students) == 1:
                 raise UniqueFound
             else:
-                print "%d students found." % len(students)
+                print("%d students found." % len(students))
                 
         def students_menu(students):
             "Select a student (or None) from a menu"
@@ -243,9 +295,9 @@ class SimpleUI(BaseUI):
                
         students = []
         try:
-            print ("Enter student data to lookup or create student. "
-                   "Search uses fuzzy matching on name and email fields.\n"
-                   "Use Ctrl-C to stop search and select from list.")
+            print("Enter student data to lookup or create student. "
+                  "Search uses fuzzy matching on name and email fields.\n"
+                  "Use Ctrl-C to stop search and select from list.")
             sid = typed_input("Enter SID: ", validators.sid, default='')
             students = db.select_students(self.db_connection, sid=sid)
             quit_if_unique(students)
@@ -301,21 +353,20 @@ class SimpleUI(BaseUI):
             # they didn't enter
             vals = {'last_name': last_name, 'first_name': first_name,
                     'sid': sid, 'email': email}
-            print "Please provide data for the student to be created:"
+            print("Please provide data for the student to be created:")
             vals = self.edit_student_dict(from_dict=vals)
             vals.pop('student_id') # we're creating a new record
             student_id = db.create_student(self.db_connection, **vals)
             student = db.select_students(self.db_connection,
                                          student_id=student_id)[0]
         else:
-            print "Could not locate student with these criteria; please try again."
+            print("Could not locate student with these criteria; please try again.")
             return self.get_student(create=create)
 
-        print "Selected: %s" % self.student_formatter(student)
+        print("Selected: %s" % self.student_formatter(student))
         return student
 
     # Top-level actions:       
-    @require('db_connection', change_database, "")
     def main_loop(self):
         "Main menu"
         while True:
@@ -339,42 +390,10 @@ class SimpleUI(BaseUI):
 
             # commit after successful completion of any top-level action
             # to avoid data-loss
-            self.db_connection.commit()
+            if self.db_connection:
+                self.db_connection.commit()
 
            
-    @require('db_connection', change_database,
-             "A database connection is required to select a course.")
-    def select_course(self):
-        """Select an existing course.
-           Lookup an existing course in the database by semester, name, or number.
-        """
-        print "(Press Enter to skip a given search criterion)"
-        year = typed_input("Enter year: ", validators.year, default='') 
-        semester = typed_input("Enter semester: ", validators.semester,
-                               default='') 
-        course_num = typed_input("Enter course number: ",
-                                 validators.course_number) 
-        course_name = typed_input("Enter course name: ", validators.course_name)
-
-        courses = db.select_courses(self.db_connection,
-                                    year=year, semester=semester,
-                                    name=course_name, number=course_num)
-                                   
-        if len(courses) == 1:
-            course = courses[0]
-            print "Found 1 course; selecting: %s" % self.course_formatter(course)
-            self.course_id = course['id']
-        elif len(courses) == 0:
-            print "No courses found matching those criteria; please try again."
-            return self.change_course()
-        else:
-            course = self.options_menu(
-                "Multiple courses found; please select one:",
-                courses, self.course_formatter, allow_none=True)
-            if course:
-                print "Selected: %s" % self.course_formatter(course)
-                self.course_id = course['id']
-
     @require('db_connection', change_database,
              "A database connection is required to edit courses.")
     def edit_courses(self):
@@ -420,31 +439,45 @@ class SimpleUI(BaseUI):
         def delete_course(c):
             existing_assignments = db.select_assignments(self.db_connection,
                                                          course_id=c['id'])
-            existing_grades = filter(lambda g: g['value'] is not None,
-                                     db.select_grades_for_course_members(
+            existing_grades = [g for g in db.select_grades_for_course_members(
                                        self.db_connection,
-                                       course_id=c['id']))
+                                       course_id=c['id'])
+                               if g['value'] is not None]
             enrollees = db.select_students(self.db_connection, course_id=c['id'])
             if existing_assignments:
-                print ("WARNING: there are %d existing assignments for this course, "
-                       "with %d associated grades.\n"
-                       "Deleting this course will DELETE THESE ASSIGNMENTS AND GRADES, "
-                       "and UNENROLL %d STUDENTS." %
-                       (len(existing_assignments), len(existing_grades), len(enrollees)))
+                print("WARNING: there are %d existing assignments for this course, "
+                      "with %d associated grades.\n"
+                      "Deleting this course will DELETE THESE ASSIGNMENTS AND GRADES, "
+                      "and UNENROLL %d STUDENTS." %
+                      (len(existing_assignments), len(existing_grades), len(enrollees)))
                 if not typed_input("Delete anyway? (Y/N) ", yn_bool):
                     return False
 
-            # deselect if this assignment was the currently selected assignment
+            # deselect if this course was the currently selected course
             if self.course_id == c['id']:
                 self.course_id = None
+            if self.assignment_id in existing_assignments:
+                self.assignment_id = None
                 
             return db.delete_course_etc(self.db_connection,
                                         course_id=c['id'])
 
         def select_course(c):
-            self.course_id = c['id']
-            print ("Selected course %s as current course.\n"
-                   % self.course_formatter(c))
+            if self.course_id != c['id']:
+                self.course_id = c['id']
+                self.assignment_id = None
+                print("Selected %s as current course."
+                      % self.course_formatter(c))
+            if user_config.use_last_due_assignment:
+                self.select_last_due_assignment()
+                if self.assignment_id:
+                    assignment = db.select_assignments(
+                        self.db_connection,
+                        assignment_id=self.assignment_id)[0]
+                    print("Selected %s as current assignment." %
+                          self.assignment_formatter(assignment))
+
+            print("")   
             return True
         
         formatter = self.course_formatter
@@ -521,9 +554,9 @@ class SimpleUI(BaseUI):
             existing_grades = db.select_grades(self.db_connection,
                                                assignment_id=a['id'])
             if existing_grades:
-                print ("WARNING: there are %d existing grades for this assignment.\n"
-                       "Deleting this assignment WILL ALSO DELETE THEM." %
-                       len(existing_grades))
+                print("WARNING: there are %d existing grades for this assignment.\n"
+                      "Deleting this assignment WILL ALSO DELETE THEM." %
+                      len(existing_grades))
                 if not typed_input("Delete anyway? (Y/N) ", yn_bool):
                     return False
 
@@ -536,8 +569,8 @@ class SimpleUI(BaseUI):
 
         def select_assignment(a):
             self.assignment_id = a['id']
-            print ("Selected assignment %s as current assignment.\n"
-                   % self.assignment_formatter(a))
+            print("Selected %s as current assignment.\n"
+                  % self.assignment_formatter(a))
             return True
         
         format_str = ("{name: <20s} {due_date: <10s} {grade_type: <7s} {weight: <6} "
@@ -557,6 +590,39 @@ class SimpleUI(BaseUI):
                         selector=select_assignment)
         
     @require('db_connection', change_database,
+             "A database connection is required to select last due assignment.")
+    @require('course_id', edit_courses,
+             "A selected course is required to select last due assignment.")
+    def select_last_due_assignment(self):
+        """Select last due assignment.
+           Selects the most recently due assignment in the current course, if any.
+        """
+        assignments = db.select_assignments(self.db_connection,
+                                            course_id=self.course_id)
+        most_recent = None
+        current_date = datetime.date.today()
+        past_assignments = [a for a in assignments
+                            if a['due_date'] and
+                               validators.date(a['due_date']) <= current_date]
+
+        if not past_assignments:
+            print("No assignments for this course have a due date in "
+                  "the past; no current assignment is set.\n")
+            self.assignment_id = None
+            return
+   
+        most_recent = past_assignments[0] 
+        most_recent_date = validators.date(most_recent['due_date'])
+        for a in past_assignments:
+            due_date = validators.date(a['due_date'])
+            if due_date > most_recent_date:
+                most_recent = a
+                most_recent_date = due_date
+
+        self.assignment_id = most_recent['id']
+
+           
+    @require('db_connection', change_database,
              "A database connection is required to enter grades.")
     @require('course_id', edit_courses,
              "A selected course is required to enter grades.")
@@ -570,8 +636,8 @@ class SimpleUI(BaseUI):
                                            assignment_id=self.assignment_id)[0]['grade_type']
         grade_validator = validators.validator_for_grade_type(grade_type)
         
-        print ""
-        print "Use Control-C to finish entering grades."
+        print("")
+        print("Use Control-C to finish entering grades.")
         while True:
             try:
                 student = self.get_student()
@@ -584,18 +650,18 @@ class SimpleUI(BaseUI):
                 except db.NoRecordsFound:
                     course = db.select_courses(self.db_connection,
                                                course_id=self.course_id)[0]
-                    print ("{student} is not a member of {course}".format(
+                    print("{student} is not a member of {course}".format(
                             student=self.student_formatter(student),
                             course=self.course_formatter(course)))
                     # offer to add to course, but don't refuse to continue if not
                     if typed_input("Add this student to the course? (Y/N) ", yn_bool):
-                       db.create_course_member(self.db_connection,
-                                               student_id=student['id'],
-                                               course_id=self.course_id)
+                        db.create_course_member(self.db_connection,
+                                                student_id=student['id'],
+                                                course_id=self.course_id)
                     else:
-                        print ("WARNING: grades for this student will not be "
-                               "calculated or reported unless you add him or her "
-                               "to the course later.")
+                        print("WARNING: grades for this student will not be "
+                              "calculated or reported unless you add him or her "
+                              "to the course later.")
                            
                 grade_id = None
                 grade_val = typed_input("Enter grade value: ", grade_validator)
@@ -604,13 +670,13 @@ class SimpleUI(BaseUI):
                                                    course_id=self.course_id,
                                                    assignment_id=self.assignment_id)
                 if existing_grades:
-                    print "Student has existing grades for this assignment."
-                    print "Existing grades are: %s" % ", ".join(
-                        str(g['value']) for g in existing_grades)
+                    print("Student has existing grades for this assignment.")
+                    print("Existing grades are: %s" % ", ".join(
+                            str(g['value']) for g in existing_grades))
                     update = typed_input("Update/overwrite? (Y/N) ", yn_bool)
                     if update:
                         if len(existing_grades) == 1:
-                            print "Will update existing grade."
+                            print("Will update existing grade.")
                             grade = existing_grades[0]
                         else:
                             grade = self.options_menu(
@@ -629,7 +695,7 @@ class SimpleUI(BaseUI):
                                           value=grade_val)
                                           
             except KeyboardInterrupt:
-                print ""
+                print("")
                 break
             # TODO: shortcut here for changing to another assignment?
             # enter_grades_for_student method? (for a single student across all course assignments)
@@ -652,7 +718,7 @@ class SimpleUI(BaseUI):
                                          for g in tbl_row['grades']))
 
         def editor(tbl_row):
-            print "Editing grades for %s." % self.student_formatter(tbl_row['student'])
+            print("Editing grades for %s." % self.student_formatter(tbl_row['student']))
             
             prompt = "New grade value for %s (default: %s): "
             any_updates = False
@@ -696,8 +762,7 @@ class SimpleUI(BaseUI):
             course_id=self.course_id)
         rows = [
             {'student': s,
-             'grades': filter(lambda r: r['student_id'] == s['id'],
-                               all_grades)}
+             'grades': [r for r in all_grades if r['student_id'] == s['id']]}
             for s in students]
 
         # we use select_assignments here because it orders the
@@ -712,8 +777,9 @@ class SimpleUI(BaseUI):
         header = row_fmt.format(name="Student",
                                 **dict((a,a) for a in assignment_names))
     
-        self.edit_table(rows, header, formatter, editor=editor)
-        print "Grades updated successfully."
+        self.edit_table(rows, header, formatter, editor=editor,
+                        entity_type='grades for student')
+        print("Grades updated successfully.")
 
     @require('db_connection', change_database,
              "A database connection is required to import students.")
@@ -763,7 +829,7 @@ class SimpleUI(BaseUI):
                 student_id=student_id,
                 course_id=self.course_id)
 
-        print "%d students imported successfully." % len(students)
+        print("%d students imported successfully." % len(students))
 
     @require('db_connection', change_database,
              "A database connection is required to edit students.")
@@ -796,7 +862,7 @@ class SimpleUI(BaseUI):
             # get_student already gave user a chance to confirm data
             pass
         
-        print "Student information updated."
+        print("Student information updated.")
 
     @require('db_connection', change_database,
              "A database connection is required to edit course memberships.")
@@ -809,9 +875,9 @@ class SimpleUI(BaseUI):
             all_courses = db.select_courses(self.db_connection)
             current_courses = db.select_courses(self.db_connection,
                                                 student_id=student['id'])
-            options = filter(lambda c: c not in current_courses, all_courses)
+            options = [c for c in all_courses if c not in current_courses]
             if not options:
-                print "\nThis student is already enrolled in every course."
+                print("\nThis student is already enrolled in every course.")
                 return None
             course = self.options_menu(
                 "Which course should the student be added to?",
@@ -823,9 +889,9 @@ class SimpleUI(BaseUI):
                 db.create_course_member(self.db_connection,
                                         student_id=student['id'],
                                         course_id=course_id)
-                print "Student added to %s" % self.course_formatter(course)
+                print("Student added to %s" % self.course_formatter(course))
             else:
-                print "Student not added to course."
+                print("Student not added to course.")
                 
             return course
                 
@@ -834,7 +900,7 @@ class SimpleUI(BaseUI):
             db.delete_course_member(self.db_connection,
                                     student_id=student['id'],
                                     course_id=course_id)
-            print "Student deleted from %s" % self.course_formatter(course)
+            print("Student deleted from %s" % self.course_formatter(course))
             return True
 
         current_courses = db.select_courses(self.db_connection,
@@ -846,7 +912,7 @@ class SimpleUI(BaseUI):
             creator=add_to_course,
             deleter=remove_from_course)
 
-        print "Student course memberships updated."
+        print("Student course memberships updated.")
         
     @require('db_connection', change_database,
              "A database connection is required to edit students in course.")
@@ -861,8 +927,8 @@ class SimpleUI(BaseUI):
             db.create_course_member(self.db_connection,
                                     student_id=student['id'],
                                     course_id=self.course_id)
-            print ("Added %s to course." %
-                   self.student_formatter(student))
+            print("Added %s to course." %
+                  self.student_formatter(student))
             return student
             
         def remove_from_course(student):
@@ -870,8 +936,8 @@ class SimpleUI(BaseUI):
             db.delete_course_member(self.db_connection,
                                     student_id=student_id,
                                     course_id=self.course_id)
-            print ("Deleted student %s from course." %
-                   self.student_formatter(student))
+            print("Deleted student %s from course." %
+                  self.student_formatter(student))
             return True
 
         current_students = db.select_students(self.db_connection,
@@ -883,8 +949,9 @@ class SimpleUI(BaseUI):
             "Current students in %s" % self.course_formatter(current_course),
             self.student_formatter,
             creator=add_to_course,
-            deleter=remove_from_course)
-        print "Course enrollments updated."
+            deleter=remove_from_course,
+            entity_type="student's membership")
+        print("Course enrollments updated.")
  
     def import_grades(self):
         pass
@@ -899,10 +966,10 @@ class SimpleUI(BaseUI):
         """
         out_file_name = typed_input("Enter a path to CSV file to export grades: ", file_path)
         if os.path.exists(out_file_name):
-            print "Warning: file %s exists." % out_file_name
+            print("Warning: file %s exists." % out_file_name)
             overwrite = typed_input("Overwrite? (Y/N) ", yn_bool)
             if not overwrite:
-                print "Abort."
+                print("Abort.")
                 return
 
         out_file = open(out_file_name, 'w')
@@ -934,25 +1001,25 @@ class SimpleUI(BaseUI):
             row = {}
             row["Name"] = "%s, %s" % (s['last_name'], s['first_name'])
             row["SID"] = s['sid']
-            grades = filter(lambda row: row['student_id'] == s['id'], all_grades)
+            grades = [r for r in all_grades if r['student_id'] == s['id']]
             for g in grades:
                 assignment_name = g['assignment_name']
                 if assignment_name not in row:
                     row[assignment_name] = g['value']
                 else:
-                    print ("Warning: multiple grades found for student %s "
-                           "for assignment %s; only exporting first result."
-                           % (self.student_formatter(s), assignment_name))
+                    print("Warning: multiple grades found for student %s "
+                          "for assignment %s; only exporting first result."
+                          % (self.student_formatter(s), assignment_name))
                     continue
             
             try:
                 writer.writerow(row)
             except IOError:
-                print ("Warning: could not write row to CSV: %r." % row)
+                print("Warning: could not write row to CSV: %r." % row)
                 continue
 
         out_file.close()
-        print "Grades exported successfully to: %s.\n" % out_file_name
+        print("Grades exported successfully to: %s.\n" % out_file_name)
                 
     @require('db_connection', change_database,
              "A database connection is required to calculate grades.")
@@ -1031,9 +1098,9 @@ class SimpleUI(BaseUI):
         calc_func = getattr(user_calculators, calc_name, None)
 
         if not calc_func:
-            print ("Could not locate grade calculation function %s. "
-                   "Have you written it?" % calc_name)
-            print ""
+            print("Could not locate grade calculation function %s. "
+                  "Have you written it?" % calc_name)
+            print("")
             return
 
         students = db.select_students(self.db_connection,
@@ -1043,16 +1110,15 @@ class SimpleUI(BaseUI):
                 course_id=self.course_id)
         
         for s in students:
-            grades = filter(lambda r: (r['student_id'] == s['id'] and
-                                       r['weight'] != 'CALC'),
-                            all_grades)
+            grades = [r for r in all_grades
+                      if (r['student_id'] == s['id'] and r['weight'] != 'CALC')]
 
             try:
                 calculated_grades = calc_func(grades)
             except Exception as e:
-                print ("Failed to calculate grades for %s. "
-                       "Error was: %s.  Skipping..." %
-                       (self.student_formatter(s), e))
+                print("Failed to calculate grades for %s. "
+                      "Error was: %s.  Skipping..." %
+                      (self.student_formatter(s), e))
                 continue
             if type(calculated_grades) is dict:
                 # transpose to the list format to use save_calculated_grades
@@ -1063,7 +1129,7 @@ class SimpleUI(BaseUI):
             for cg in calculated_grades:
                 save_calculated_grade(s['id'], **cg)
 
-        print "Grade calculations ran successfully.\n"
+        print("Grade calculations ran successfully.\n")
 
     @require('db_connection', change_database,
              "A database connection is required to view a grade report.")
@@ -1074,18 +1140,24 @@ class SimpleUI(BaseUI):
            See a report on grades in the current course."""
         r = reports.GradeReport(self.db_connection, course_id=self.course_id)
         r.run()
-        print r.as_text(compact=True)
+        print(r.as_text(compact=True))
         if typed_input("See and save the full report? (Y/N): ", yn_bool):
             # TODO: support for pager program?
             full_report = r.as_text(compact=False)
-            print full_report
+            print(full_report)
             
             course = db.select_courses(self.db_connection,
                                        course_id=self.course_id)[0]
             name = "grade_report_{number}_{semester}_{year}-".format(**course)
             with tempfile.NamedTemporaryFile(prefix=name, delete=False) as t:
-                t.write(full_report)
-                print "Full report saved at: %s\n" % t.name
+                try:
+                    # 3.x
+                    report_bytes = full_report.encode("utf-8")
+                except AttributeError:
+                    # 2.x
+                    report_bytes = full_report
+                t.write(report_bytes)
+                print("Full report saved at: %s\n" % t.name)
 
     def exit(self):
         """Quit grader.
@@ -1118,11 +1190,11 @@ class SimpleUI(BaseUI):
             short_descs.append(lines[0])
             long_descs.append(' '.join([l.strip() for l in lines[1:]]))
 
-        print ""
-        print query
-        print "Please select one of the following actions:"
+        print("")
+        print(query)
+        print("Please select one of the following actions:")
         for i, a in enumerate(actions):
-            print menu_format.format(i, short_descs[i], long_descs[i])
+            print(menu_format.format(i, short_descs[i], long_descs[i]))
 
         if default is not None:
             prompt = "Which action? (default %d): " % actions.index(default)
@@ -1132,7 +1204,7 @@ class SimpleUI(BaseUI):
         validator = lambda s: validators.int_in_range(s, 0, len(actions))
         i = typed_input(prompt, validator,
                         default=actions.index(default) if default in actions else None)
-        print "" # visually separate menu and selection 
+        print("") # visually separate menu and selection 
         
         return actions[i]()
 
@@ -1148,28 +1220,28 @@ class SimpleUI(BaseUI):
            allow_none, if true, will add an option for the user to make no selection.
            Returns the selected option or None.
         """
-        print ""
-        print query
+        print("")
+        print(query)
         menu_format = "{0:>3d}: {1}"
         max_index = len(options) - 1
         escape_option = None
         none_option = None
         for i, o in enumerate(options):
-            print menu_format.format(i, formatter(o))
+            print(menu_format.format(i, formatter(o)))
         if escape:
             escape_option = max_index 
             max_index += 1
-            print menu_format.format(max_index, escape.__doc__.splitlines()[0])
+            print(menu_format.format(max_index, escape.__doc__.splitlines()[0]))
         if allow_none:
             # TODO: something wrong with logic here; escape doesn't work
             none_option = max_index
             max_index += 1
-            print menu_format.format(max_index, "None of the above")
+            print(menu_format.format(max_index, "None of the above"))
 
         validator = lambda s: validators.int_in_range(s, 0, max_index+1)
             
         idx = typed_input("Which option? (enter a number): ", validator)
-        print "" # visually separate menu and selection input 
+        print("") # visually separate menu and selection input 
         
         if idx < len(options):
             return options[idx]
@@ -1204,7 +1276,7 @@ class SimpleUI(BaseUI):
         """
         editable_rows = [r for r in rows]
         header_underline = "-".ljust(80, "-")
-        row_format = "{index: >3}: {frow: <75s}"
+        row_format = "{index: >5}: {frow: <73s}"
         def validator(s):
             s = s.strip().lower()
             if s.startswith('d'):
@@ -1223,26 +1295,26 @@ class SimpleUI(BaseUI):
                 
         while True:
             try:
-                print ""
-                print row_format.format(index='#', frow=header)
-                print header_underline
+                print("")
+                print(row_format.format(index='Row #', frow=header))
+                print(header_underline)
                 if editable_rows:
                     for i, r in enumerate(editable_rows):
-                        print row_format.format(index=i, frow=formatter(r))
+                        print(row_format.format(index=i, frow=formatter(r)))
                 else:
-                    print "(No %s data yet.)" % entity_type
+                    print("(No %s data yet.)" % entity_type)
 
-                print ""
+                print("")
                 prompt = "Press Ctrl-C to end.\n"
                 if creator:
                     prompt += "Enter 'c' to create a new %s. " % entity_type
                 if editor:
-                    prompt += "Prefix %s # with 'e' to edit. " % entity_type
+                    prompt += "Prefix row # with 'e' to edit %s. " % entity_type
                 if deleter:
-                    prompt += "Prefix %s # with 'd' to delete. " % entity_type
+                    prompt += "Prefix row # with 'd' to delete %s. " % entity_type
                 if selector:
-                    prompt += ("\nEnter %s # to select as current %s. " %
-                               (entity_type, entity_type))
+                    prompt += ("\nEnter row # to select as current %s. " %
+                               entity_type)
                 prompt += "\nWhat do you want to do? "
                     
                 action, idx = typed_input(prompt, validator)
@@ -1255,7 +1327,7 @@ class SimpleUI(BaseUI):
                     if success:
                         editable_rows.pop(idx)
                     else:
-                        print "Deletion unsuccessful."
+                        print("Deletion unsuccessful.")
                 elif action == 'c' and creator: 
                     new_row = creator()
                     if new_row: # creator might return None
@@ -1266,7 +1338,7 @@ class SimpleUI(BaseUI):
                         return editable_rows
                     
             except KeyboardInterrupt:
-                print ""
+                print("")
                 break
 
         return editable_rows
@@ -1290,7 +1362,7 @@ class SimpleUI(BaseUI):
         if not skip:
             skip = []
 
-        for k, v in d.iteritems():
+        for k, v in d.items():
             if k in skip:
                 continue
             
@@ -1340,25 +1412,25 @@ class SimpleUI(BaseUI):
         "Prints information about the currently selected course"
         if self.course_id:
             course = db.select_courses(self.db_connection, course_id=self.course_id)[0]
-            print "Current course is: %s" % self.course_formatter(course) 
+            print("Current course is: %s" % self.course_formatter(course))
         else:
-            print "No course selected"
+            print("No course selected")
            
     def print_assignment_info(self):
         "Prints information about the currently selected assignment"
         if self.assignment_id:
             assignment = db.select_assignments(self.db_connection,
                                                assignment_id=self.assignment_id)[0]
-            print "Current assignment is: %s" % self.assignment_formatter(assignment)
+            print("Current assignment is: %s" % self.assignment_formatter(assignment))
         else:
-            print "No assignment selected"
+            print("No assignment selected")
 
     def print_db_info(self):
          "Prints information about the database connection"
          if self.db_connection:
-             print "Database open at %s" % self.db_file
+             print("Database open at %s" % self.db_file)
          else:
-             print "No current database connection"
+             print("No current database connection")
 
         
             
@@ -1382,7 +1454,7 @@ def typed_input(prompt1, constructor, prompt2=None, default=None):
     val = None
     while val is None:
         try:
-            s = raw_input(prompt)
+            s = input(prompt)
             if not s and default is not None:
                 val = default
             else:
