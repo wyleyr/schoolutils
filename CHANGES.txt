@@ -1,3 +1,10 @@
+v0.1.7, 2013-11-02 -- Report, UI improvements; Begin work to support Python 3 
+  - initial work to make code compatible with Python 3
+  - improved prompts for editing interfaces
+  - support for grade frequencies/histograms in grade report
+  - support for selecting current assignment based on due date
+  - bugfixes
+
 v0.1.6, 2013-05-25 -- Grade reports, UI improvements
   - new interfaces for editing and deleting courses and assignments;
     improved interfaces for selecting courses and assignments;
