@@ -103,8 +103,8 @@ class GradeReport(Report):
         """
         values, weights, types, _ = ch.unpack_entered_grades(grades)
         grade_type = types[0] # values are for single assignment and grade type
-        mn = ch.min_for_type(values, grade_type)
-        mx = ch.max_for_type(values, grade_type)
+        mn = ch.min_for_type(values, grade_type, filter_nan=True)
+        mx = ch.max_for_type(values, grade_type, filter_nan=True)
         avg = ch.mean_for_type(values, grade_type, filter_nan=True)
         letter_avg = None
         if math.isnan(avg):
@@ -127,14 +127,14 @@ class GradeReport(Report):
         else:
             if types[0] == '4points':
                 scale = ch.POINTS
-            elif types[0] == 'percent':
+            elif types[0] == 'percentage':
                 scale = ch.PERCENTS
             else:
                 raise ValueError("Can't calculate histogram bins for assignment type %s" %
                                  types[0])
             bins = [(p[2], p[3]) for p in scale]
             bins.pop(-1) # remove "dummy" limits bin with inf/-inf bounds 
-            freqs = ch.freqs_for_numbers(values, bins)
+            freqs = ch.freqs_for_numbers(values, bins, filter_nan=True)
 
         def bin_str(b):
             if isinstance(b, tuple):
@@ -142,7 +142,7 @@ class GradeReport(Report):
             else:
                 return b # letter grade "bins" are already strings
             
-        line_template = "{bin: >10}: {freq: <5} {bars}\n"
+        line_template = "{bin: >15}: {freq: <5} {bars}\n"
         lines = [line_template.format(bin=bin_str(b),
                                       bars="".join("|" for i in range(freqs[b])),
                                       freq=("({0})".format(freqs[b]) if freqs[b] else ""))
