@@ -184,15 +184,17 @@ def calculation_for_type(grades, grade_type, numeric_func,
     else:
         raise ValueError("Unknown grade type: %s" % grade_type)
        
-def min_for_type(values, grade_type):
+def min_for_type(values, grade_type, filter_nan=False):
     "Returns minimum value in a list of grades."
     return calculation_for_type(values, grade_type, min,
-                                letter_func=letter_grade_min)
+                                letter_func=letter_grade_min,
+                                filter_nan=filter_nan)
 
-def max_for_type(values, grade_type):
+def max_for_type(values, grade_type, filter_nan=False):
     "Returns maximum value in a list of grades."
     return calculation_for_type(values, grade_type, max,
-                                letter_func=letter_grade_max)
+                                letter_func=letter_grade_max,
+                                filter_nan=filter_nan)
 
 def mean_for_type(values, grade_type, filter_nan=False):
     "Returns unweighted average (mean) value in a list of grades."
@@ -210,15 +212,20 @@ def freqs_for_letters(values):
             freqs[v] += 1
     return freqs
 
-def freqs_for_numbers(values, bins):
+def freqs_for_numbers(values, bins, filter_nan=False):
     """Returns frequencies for a list of numeric grade values.
        Values are binned according to the ranges defined by the bins:
          each item in bins should be a tuple t such that
           t[0] is an exclusive max, and
           t[1] is an inclusive min
          defining the range for a bin.
-       Frequencies are represented as a dictionary mapping bins to integers."""
+       Frequencies are represented as a dictionary mapping bins to integers.
+       If filter_nan is True, float('NaN') and None values are omitted before
+       calculating frequencies."""
     freqs = dict((b, 0) for b in bins)
+    if filter_nan:
+        values = remove_none_and_nan(values)
+        
     for v in values:
         for b in bins:
             if b[0] > v >= b[1]:
