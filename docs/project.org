@@ -448,6 +448,15 @@ that was most recently due?
    their names, which is inconsistent with the grader's use of
    `points' as a type for grades which have a number of possible
    points.  Change to `fourpoints'?
+** TODO [#B] More helpful messages in report for ungraded assignments :ui:reporting:
+   Since 0.1.7, assignments with no grades in them get an unhelpful:
+   "No statistics available for this assignment, because:
+    min() arg is an empty sequence"
+   This is arguably better than the previous situation (a complete but
+   empty report containing every student's name as someone who is
+   missing a grade).  But it would be better to indicate that no
+   information is provided because no grades have been entered for
+   that assignment.
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so
