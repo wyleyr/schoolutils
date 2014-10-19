@@ -129,6 +129,10 @@ class GradeReport(Report):
                 scale = ch.POINTS
             elif types[0] == 'percentage':
                 scale = ch.PERCENTS
+            elif types[0] == 'points':
+                # for now, assume bin size of 1 for points grades
+                scale = [(None, i, i+1, i) for i in range(weights[0] + 1)] +\
+                        [(None, float('inf'), float('inf'), float('inf'))]
             else:
                 raise ValueError("Can't calculate histogram bins for assignment type %s" %
                                  types[0])
