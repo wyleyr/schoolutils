@@ -25,13 +25,19 @@
 ** INPROGRESS [#B] Summary statistics				  :reporting:
 *** Grade reports for current course
 It would be nice to:
-  - see averages (mean, median...) by assignment
-  - see high score, low score by assignment
-  - see which students have no score by assignment
-  - see grade trends for individual students and course as a whole
+  - [X] see averages (mean, median...) by assignment
+  - [X] see high score, low score by assignment
+  - [X] see which students have no score by assignment
+  - [ ] see grade trends for individual students and course as a whole
     (e.g., did students improve overall on second assignment?)
-  - see projected final grades for students?
-  - see how current course compares to others?
+  - [ ] see projected final grades for students?
+  - [ ] see how current course compares to others?
+
+Things to think more about:
+  1) Histogram bin sizes for "points"-type grades.
+  2) Should reports be per-assignment rather than (or in addition to)
+     per-course?
+  3) In general, need an API for user-defined reports.
 
 *** Implementation proposal
 1) schoolutils.reporting: home for reporting functions
@@ -457,6 +463,71 @@ that was most recently due?
    missing a grade).  But it would be better to indicate that no
    information is provided because no grades have been entered for
    that assignment.
+** TODO [#A] Org-based UI
+   - enter grades in Org tables
+   - write calculators as Babel code blocks
+   - display table with calculated grades, grade reports, etc. to user
+   - use grade table to update underlying database 
+*** TODO Prologue, etc. for setting up UI when evaluating a code block
+Need a function to do the same things the command line UI does: import
+config files, set up important state (current
+year/semester/class/assignment), etc.  Then this can be called in Org
+using the :prologue header argument.
+
+*** TODO OrgTable base class     
+This class should be in charge of marshalling data between the Org
+table format (basically, a list of lists of strings) and the grade
+database tables, and providing convenient abstractions for
+manipulating and displaying that data in a way Org understand.
+**** TODO Load and validate data from an Org table
+**** TODO Load data from underlying database 
+(for easy display of existing data in Org)
+**** TODO Pretty-print results table in a way Org understands
+
+*** TODO GradeTable class
+It would be nice to write a table in Org like
+
+|      SID | Essay 1 | Essay 2 |
+|----------+---------+---------|
+| 01234567 | A-      |         |
+
+then be able to say
+#+BEGIN_SRC python :var grades=grade_table
+from schoolutils.grading.ui.org import GradeTable
+
+gt = GradeTable(grade_table)
+essay1_grades = gt[assignment="Essay 1"]
+student1_grades = gt[sid="01234567"]
+for row in gt:
+  final_grade = weighted_average(row)
+# etc.
+#+END_SRC
+
+This class should inherit from OrgTable 
+**** TODO Convenience methods
+     - extract row for student
+     - extract column for reporting by assignment
+     - commit to database as updates or overwrites
+
+
+*** TODO AssignmentTable class
+It would be nice to write a table in Org like
+
+| Assignment | Type   | Weight | Due date         |
+|------------+--------+--------+------------------|
+| Essay 1    | letter |   0.20 | <2014-12-04 Thu> |
+
+then be able to say
+#+BEGIN_SRC python :var assignments=assignments
+from schoolutils.grading.ui.org import AssignmentTable
+
+at = AssignmentTable(assignments)
+at.commit()
+# etc.
+#+END_SRC
+
+This class should inherit from OrgTable 
+
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so
