@@ -468,11 +468,16 @@ that was most recently due?
    - write calculators as Babel code blocks
    - display table with calculated grades, grade reports, etc. to user
    - use grade table to update underlying database 
-*** TODO Prologue, etc. for setting up UI when evaluating a code block
+*** TODO Prologue or similar for setting up UI when evaluating a code block
 Need a function to do the same things the command line UI does: import
 config files, set up important state (current
 year/semester/class/assignment), etc.  Then this can be called in Org
 using the :prologue header argument.
+
+Better option: don't do this as a prologue; instead, expose various
+tables (Assignments, GradeSpreadsheet, etc.) as classes *that derive
+from BaseUI*, so they automatically get access to a db connection,
+user config, etc.
 
 *** TODO OrgTable base class     
 This class should be in charge of marshalling data between the Org
