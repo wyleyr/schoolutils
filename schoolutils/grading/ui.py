@@ -1432,7 +1432,78 @@ class SimpleUI(BaseUI):
          else:
              print("No current database connection")
 
+ 
+class OrgTableUI(BaseUI):
+    """Base UI class for interacting with tables coming from, and
+       going to, Org Mode.
+    """
+    def __init__(self):
+        super(OrgTableUI, self).__init__()
+        self.column_info = None
+        self.data = None
+
+    def orgify(self):
+        header = [c.get('pretty_name', c['name']) for c in self.column_info]
+        printers = [c.get('printer', str) for c in self.column_info]
+
+        rows = []
+        for row in self.data:
+            rows.append([p(val) for val, p  in zip(row, printers)])
+                
+        # TODO: remove invisible columns
+        return header + rows
+
+    def unorgify_table(self, org_tbl):
+        # lookup an approriate validator for each column
+        # for each row in the table:
+        # validate the data in each column
+        # append the validated row to an OrgTable instance
+        pass 
+    
+
+
+class AssignmentTable(OrgTableUI):
+    """Manipulates assignments 
+    """
+    def __init__(self):
+        super(AssignmentTable, self).__init__()
+        self.column_info = [
+            {'name': 'id',
+             'visible': False},
+            {'name': 'course_id',
+             'visible': False},
+            {'name': 'name',
+             'pretty_name': 'Assignment',
+             'visible': True,
+             'validator': validators.assignment_name},
+            {'name': 'due_date',
+             'pretty_name': 'Due date',
+             'visible': True,
+             'validator': validators.date,
+             'printer': str}, #TODO
+            {'name': 'grade_type',
+             'pretty_name': 'Grade type',
+             'visible': True,
+             'validator': validators.grade_type,
+             'printer': str}, #TODO
+            {'name': 'weight',
+             'pretty_name': 'Weight',
+             'validator': validators.weight,
+             'printer': lambda f: "%s".format(f)} #TODO
+            ]
+            
+    def load(self, **kwargs):
+        "Load assignments from the database for the current course"
+        self.data = db.select_assignments(self.db_connection,
+                                          course=self.current_course,
+                                          **kwargs)
         
+    def update(self):
+        pass
+
+    def save(self):
+        pass
+
             
 #
 # Utilities
@@ -1464,7 +1535,6 @@ def typed_input(prompt1, constructor, prompt2=None, default=None):
             continue
 
     return val
-
 #
 # Constructors/validators
 # 
