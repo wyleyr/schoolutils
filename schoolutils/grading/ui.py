@@ -86,9 +86,9 @@ class BaseUI(object):
 
         
     def get_config_option(self, option_name, validator, default=None):
-        """Return the appropriate config value from CLI options or user config.
-           option_name should be an attribute to look for on both the options
-             object and the user_config module.  CLI options override user_config
+        """Return the appropriate config value from options or user config.
+           option_name should be an attribute to look for in both the options
+             dict and the user_config module.  options override user_config
              values.
            validator will be applied to the value.
            Returns the validated value, or default if option is not
@@ -103,7 +103,7 @@ class BaseUI(object):
             return default
 
     def initial_database_setup(self):
-        "Set db_file and db_connection from user config and CLI options"
+        "Set db_file and db_connection from user config and options"
         self.db_file = self.get_config_option('gradedb_file', file_path)
         if self.db_file and os.path.exists(self.db_file):
             try:
@@ -116,7 +116,7 @@ class BaseUI(object):
             
     def initial_course_setup(self):
         """Set semester, year, current_courses, and course_id from user config
-           and CLI options"""
+           and options"""
         
         self.semester = self.get_config_option('current_semester',
                                                validators.semester)
@@ -142,7 +142,7 @@ class BaseUI(object):
             
             
     def initial_assignment_setup(self):
-        "Set assignment_id using user config and CLI options"
+        "Set assignment_id using user config and options"
         if not (self.db_connection and self.course_id):
             return
 
@@ -185,7 +185,7 @@ class SimpleUI(BaseUI):
    
     # BaseUI overrides
     def initial_database_setup(self):
-        """Set db_file and db_connection from user config and CLI options.
+        """Set db_file and db_connection from user config and options.
            Query the user if automatic database connection fails."""
         super(SimpleUI, self).initial_database_setup()
         if self.db_connection:
