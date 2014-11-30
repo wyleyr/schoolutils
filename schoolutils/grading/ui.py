@@ -32,7 +32,7 @@ except NameError:
 # imports compatible across Python versions
 import os, sys, csv, datetime, tempfile
 
-from schoolutils.config import user_config, user_calculators
+from schoolutils.config import user_config, user_calculators, CONFIG_DEFAULTS
 from schoolutils.grading import db, validators
 from schoolutils.reporting import reports
 
@@ -63,15 +63,17 @@ def require(attribute, callback, message):
 class BaseUI(object):
     def __init__(self, options=None):
         """Initialize grading program UI.
-           options, if provided, should be an options structure produced by
-             optparse
+           options, if provided, should be a dictionary with keys matching
+             those in schoolutils.config.CONFIG_DEFAULTS, or an options structure,
+             as produced e.g. by optparse
         """
         if options:
-            self.cli_options = options
+            if not isinstance(options, dict):
+                options = vars(options)
+            self.options = {k: options[k] for k in options if k in CONFIG_DEFAULTS}
         else:
-            self.cli_options = None
+            self.options = {}
             
-        
         self.semester = None
         self.year = None
         self.current_courses = []
@@ -93,7 +95,7 @@ class BaseUI(object):
            supplied by the user or the user-supplied value does not
            pass validation.
         """
-        val = (getattr(self.cli_options, option_name, '') or
+        val = (self.options.get(option_name, '') or
                getattr(user_config, option_name, ''))
         try:
             return validator(val)
