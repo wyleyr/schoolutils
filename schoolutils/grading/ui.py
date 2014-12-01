@@ -1439,36 +1439,27 @@ class OrgTableUI(BaseUI):
     """Base UI class for interacting with tables coming from, and
        going to, Org Mode.
     """
-    def __init__(self):
-        super(OrgTableUI, self).__init__()
+    def __init__(self, *args, **kwargs):
+        super(OrgTableUI, self).__init__(*args, **kwargs)
         self.column_info = None
         self.data = None
-
+        
     def orgify(self):
         header = [c.get('pretty_name', c['name']) for c in self.column_info]
         printers = [c.get('printer', str) for c in self.column_info]
 
-        rows = []
+        rows = [header, None] # abuse None to produce hline after header
         for row in self.data:
-            rows.append([p(val) for val, p  in zip(row, printers)])
+            rows.append([p(val) for val, p in zip(row, printers)])
                 
-        # TODO: remove invisible columns
-        return header + rows
-
-    def unorgify_table(self, org_tbl):
-        # lookup an approriate validator for each column
-        # for each row in the table:
-        # validate the data in each column
-        # append the validated row to an OrgTable instance
-        pass 
-    
-
+        # TODO: remove invisible columns...itertools.compress?
+        return rows
 
 class AssignmentTable(OrgTableUI):
     """Manipulates assignments 
     """
-    def __init__(self):
-        super(AssignmentTable, self).__init__()
+    def __init__(self, *args, **kwargs):
+        super(AssignmentTable, self).__init__(*args, **kwargs)
         self.column_info = [
             {'name': 'id',
              'visible': False},
@@ -1482,7 +1473,7 @@ class AssignmentTable(OrgTableUI):
              'pretty_name': 'Due date',
              'visible': True,
              'validator': validators.date,
-             'printer': str}, #TODO
+             'printer': lambda d: "<{date}>".format(date=str(d))}, #TODO
             {'name': 'grade_type',
              'pretty_name': 'Grade type',
              'visible': True,
@@ -1490,23 +1481,114 @@ class AssignmentTable(OrgTableUI):
              'printer': str}, #TODO
             {'name': 'weight',
              'pretty_name': 'Weight',
-             'validator': validators.weight,
-             'printer': lambda f: "%s".format(f)} #TODO
+             'validator': validators.grade_weight,
+             'printer': str} #TODO
             ]
             
     def load(self, **kwargs):
         "Load assignments from the database for the current course"
         self.data = db.select_assignments(self.db_connection,
-                                          course=self.current_course,
+                                          course_id=self.course_id,
                                           **kwargs)
+        return self.data
         
-    def update(self):
+    def update(self, org_table):
         pass
+
+    def sync(self, org_table):
+        """Load data from the database, update with data from org_table, save to database,
+           then return the updated table to Org.
+        """
+        self.load()
+        self.update(org_table)
+        self.save()
+        return self.orgify()
 
     def save(self):
         pass
 
-            
+class GradeSpreadsheet(OrgTableUI):
+    """Manipulates grades for a course in a convenient spreadsheet format
+    """
+    def __init__(self, *args, **kwargs):
+        super(GradeSpreadsheet, self).__init__(*args, **kwargs)
+        self.build_column_info()
+        
+    def build_column_info(self):
+        cols = [{'name': 'sid',
+                 'pretty_name': 'SID',
+                 'validator': validators.sid,
+                 'visible': True}]
+
+        assignments = db.select_assignments(self.db_connection,
+                                            course_id=self.course_id)
+        for a in assignments:
+            validator = validators.validator_for_grade_type(a['grade_type'])
+            printer = str # TODO
+            cols.append({'assignment_id': a['id'], # hang onto assignment id for easy ref
+                         'name': '',
+                         'pretty_name': a['name'],
+                         'visible': True,
+                         'validator': validator,
+                         'printer': printer}) 
+
+        self.column_info = cols
+        return self.column_info
+
+    def load(self):
+        students = db.select_students(self.db_connection, course_id=self.course_id) 
+        all_grades = db.select_grades_for_course_members(self.db_connection,
+                                                         course_id=self.course_id)
+        
+        # the intermediate data format here is a dictionary, indexed
+        # by SID, mapped to rows representing the grades in this
+        # course for the corresponding student
+        data = {}
+        for s in students:
+            data[s['sid']] = [grade_row for grade_row in all_grades
+                              if grade_row['student_id'] == s['id']]
+
+        self.data = data 
+        
+    def orgify(self):
+        # override base class since the relationship between the
+        # intermediate data format, the output column info, and the
+        # underlying data tables is fairly complicated
+        if not self.column_info:
+            self.build_column_info()
+
+        header = [c['pretty_name'] for c in self.column_info]
+        rows = [header, None] # abuse None to get an hline after header
+        for sid, grade_rows in self.data.items():
+            row = [sid]
+            for c in self.column_info:
+                if 'assignment_id' not in c:
+                    continue # no grades for non-assignment columns
+
+                #TODO: what if there are multiple grades?
+                grade_for_assignment = [row for row in grade_rows
+                                        if row['assignment_id'] == c['assignment_id']][0]['value'] 
+                row.append(c['printer'](grade_for_assignment))
+            rows.append(row)
+
+        return rows
+
+    def update(self):
+        pass
+    
+    def sync(self):
+        pass
+
+    def save(self):
+        pass
+    
+    def as_csv(self):
+        pass
+
+    
+class GradeReport(OrgTableUI):
+    """Displays a grade report for current course
+    """
 #
 # Utilities
 # 
