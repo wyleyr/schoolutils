@@ -1546,7 +1546,9 @@ class AssignmentTable(OrgTableUI):
                                            course_id=self.course_id,
                                            assignment_id=assignment_id,
                                            **query_args)
-            
+        
+        # only commit if all updates are successful
+        self.db_connection.commit()
             
 
     def sync(self, org_table):
