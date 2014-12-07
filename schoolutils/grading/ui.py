@@ -1520,6 +1520,13 @@ class AssignmentTable(OrgTableUI):
                        if th == c['pretty_name']]
 
         for row in org_table[1:]:
+            # ignore rows containing no data
+            for v in row:
+                if v:
+                    break
+            else:
+                continue # that is, continue the outer loop
+
             query_args = {self.column_info[ci]['field']:
                               self.column_info[ci]['validator'](row[ti])
                           for ti, ci in col_mapping}
