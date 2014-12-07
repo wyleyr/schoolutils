@@ -153,7 +153,9 @@ class BaseUI(object):
                 sys.stderr.write("Ignoring use_last_due_assignment.\n")
 
        
-
+#
+# command line UI
+#
 class SimpleUI(BaseUI):
     """Manages a simple (command line) user interface.
     """
@@ -1435,6 +1437,14 @@ class SimpleUI(BaseUI):
              print("No current database connection")
 
  
+#
+# Org mode UI
+# 
+class OrgColumnError(Exception):
+    """Indicates an exception arising from an Org table column name
+    """
+    pass
+
 class OrgTableUI(BaseUI):
     """Base UI class for interacting with tables coming from, and
        going to, Org Mode.
@@ -1445,7 +1455,7 @@ class OrgTableUI(BaseUI):
         self.data = None
         
     def orgify(self):
-        header = [c.get('pretty_name', c['name']) for c in self.column_info]
+        header = [c.get('pretty_name', '') for c in self.column_info]
         printers = [c.get('printer', str) for c in self.column_info]
 
         rows = [header, None] # abuse None to produce hline after header
@@ -1461,25 +1471,25 @@ class AssignmentTable(OrgTableUI):
     def __init__(self, *args, **kwargs):
         super(AssignmentTable, self).__init__(*args, **kwargs)
         self.column_info = [
-            {'name': 'id',
-             'visible': False},
-            {'name': 'course_id',
-             'visible': False},
-            {'name': 'name',
+            # {'field': 'id',
+            #  'visible': False},
+            # {'field': 'course_id',
+            #  'visible': False},
+            {'field': 'name',
              'pretty_name': 'Assignment',
              'visible': True,
              'validator': validators.assignment_name},
-            {'name': 'due_date',
+            {'field': 'due_date',
              'pretty_name': 'Due date',
              'visible': True,
-             'validator': validators.date,
-             'printer': lambda d: "<{date}>".format(date=str(d))}, #TODO
-            {'name': 'grade_type',
+             'validator': validators.org_date,
+             'printer': lambda d: "<{date}>".format(date=str(d))}, 
+            {'field': 'grade_type',
              'pretty_name': 'Grade type',
              'visible': True,
              'validator': validators.grade_type,
              'printer': str}, #TODO
-            {'name': 'weight',
+            {'field': 'weight',
              'pretty_name': 'Weight',
              'validator': validators.grade_weight,
              'printer': str} #TODO
@@ -1487,25 +1497,59 @@ class AssignmentTable(OrgTableUI):
             
     def load(self, **kwargs):
         "Load assignments from the database for the current course"
-        self.data = db.select_assignments(self.db_connection,
-                                          course_id=self.course_id,
-                                          **kwargs)
+        assignments = db.select_assignments(self.db_connection,
+                                            course_id=self.course_id,
+                                            **kwargs)
+        self.data = [[a[c['field']] for c in self.column_info]
+                      for a in assignments]
         return self.data
         
     def update(self, org_table):
-        pass
+        table_headers = org_table[0]
+        # sanity check: assignment name must be one of the columns; otherwise,
+        # there's no way to identify assignments in the db
+        if 'Assignment' not in table_headers:
+            raise OrgColumnError("No column named 'Assignment' in assignments "
+                                 "table.  This column is required.") 
+
+        # index mapping between columns in org_table and self.column_info.
+        # This allows the user to re-order or leave out columns if desired.
+        col_mapping = [(ti, ci)
+                       for ti, th in enumerate(table_headers)
+                       for ci, c in enumerate(self.column_info)
+                       if th == c['pretty_name']]
+
+        for row in org_table[1:]:
+            query_args = {self.column_info[ci]['field']:
+                              self.column_info[ci]['validator'](row[ti])
+                          for ti, ci in col_mapping}
+                
+            try:
+                assignment_id = db.ensure_unique(db.select_assignments(
+                        self.db_connection,
+                        course_id=self.course_id,
+                        name=query_args['name']))
+            except db.NoRecordsFound:
+                # be permissive here. If there is not already an
+                # existing assignment by this name, assume one should
+                # be created, unless name is empty.
+                assignment_id = None
+
+            db.create_or_update_assignment(self.db_connection,
+                                           course_id=self.course_id,
+                                           assignment_id=assignment_id,
+                                           **query_args)
+            
+            
 
     def sync(self, org_table):
-        """Load data from the database, update with data from org_table, save to database,
-           then return the updated table to Org.
+        """Update database with data from org_table, then return the
+           updated table to Org.
         """
-        self.load()
         self.update(org_table)
-        self.save()
+        self.load()
         return self.orgify()
 
-    def save(self):
-        pass
 
 class GradeSpreadsheet(OrgTableUI):
     """Manipulates grades for a course in a convenient spreadsheet format

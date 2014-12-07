@@ -22,12 +22,26 @@ Validator functions for grading utilities
 # 02110-1301, USA.
 
 import datetime
+import re
 
 from schoolutils.config import user_validators
+
 
 def user_override(f):
     "Decorator: makes a validator overrideable by user's validators.py"
     return getattr(user_validators, f.__name__, f)
+
+def allow_explicit_none(f):
+    """Decorator: makes a validator return None when passed 'None' explicitly.
+       WARNING: this is usually not desirable, and may result in data integrity
+       problems.
+    """
+    def weakened_f(s):
+        if s == "None":
+            return None
+        else:
+            return f(s)
+    return weakened_f
 
 # Validators:
 def number_in_range(s, constructor, mn, mx):
@@ -66,7 +80,20 @@ def date(s):
     d = day(d)
     return datetime.date(y, m, d)
 
+def org_date(s):
+    """Convert s to a datetime.date.
+       s is assumed to be in Org mode timestamp format"""
+    ma = re.search("(?P<year>[0-9]{4})-(?P<month>[0-9]{2})-(?P<day>[0-9]{2})", s)
+    if not ma:
+        raise ValueError("Not a valid Org timestamp: '%s'" % s)
+    parts = ma.groupdict()
+    y = year(parts['year'])
+    m = month(parts['month'])
+    d = day(parts['day'])
+    return datetime.date(y, m, d)
+
 @user_override
+@allow_explicit_none
 def grade_type(s):
     """Ensure s is a valid grade type.
 
@@ -80,13 +107,18 @@ def grade_type(s):
     return t
 
 @user_override
+@allow_explicit_none
 def grade_weight(s):
     """Ensure s is a valid grade weight.
 
-       By default, this function is just an alias for float(); provide
-       your own in your validators.py.
+       By default, this function accepts any string convertable to a
+       float() value, or the special string 'CALC' for calculated
+       grades; provide your own in your validators.py.
     """
-    return float(s)
+    if s == 'CALC':
+        return s
+    else:
+        return float(s)
 
 @user_override
 def percentage_grade(s):
