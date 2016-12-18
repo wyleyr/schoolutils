@@ -533,6 +533,29 @@ at.commit()
 
 This class should inherit from OrgTable 
 
+** TODO Better support "intermediate" grades and final calculations
+A common pattern I need is:
+  - calculate intermediate grades from raw rubric scores
+  - then calculate the final grade from intermediate grades
+
+Another thing that would be helpful regardless of whether letter
+grades are entered or intermediate: an equivalent of
+letter_grade_average function that works on the rows passed to the
+grade calculation function.  It should be as easy as writing
+
+#+BEGIN_SRC python
+  def calculate_grade_foo(rows):
+    return {name: 'Final grade',
+            value: ch.average_over(rows) # possibly filtering out rows first
+            }
+#+END_SRC
+         
+** TODO Support entering grades for everyone in course
+At the end of the semester, I may need to assign everyone a
+participation grade, etc.  It would be nice to just loop over everyone
+in the course and assignment them a grade, without having to search
+for every student.
+
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
    - problem was join: a student can appear in multiple courses, so
