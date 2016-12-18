@@ -22,7 +22,7 @@
 ** TODO [#B] Interfaces to reporting functions		       :ui:reporting:
 ** TODO [#D] More sophisticated UI? Curses-based? 			 :ui:
 ** TODO [#C] Separation of 'view' and 'controller' UI code		 :ui:
-** INPROGRESS [#B] Summary statistics				  :reporting:
+** TODO [#B] Summary statistics                                   :reporting:
 *** Grade reports for current course
 It would be nice to:
   - [X] see averages (mean, median...) by assignment
@@ -72,7 +72,11 @@ It would be nice for reporting to be this easy:
   # etc.
 #+END_SRC
 
-** TODO [#C] PGP encryption/decryption of database file		      :ui:db:
+** CANCELED [#C] PGP encryption/decryption of database file           :ui:db:
+   :LOGBOOK:
+   - State "CANCELED"   from "TODO"       [2016-12-18 Sun 14:30] \\
+     This is better done with something like git-crypt, IMO.
+   :END:
 ** TODO [#A] Export grades to gradebook format		   :bspace:ui:export:
 ** DONE [#C] distribute on PyPI					  :packaging:
    - need to remove/abstract out Berkeley-specific code, like
@@ -105,7 +109,7 @@ It would be nice for reporting to be this easy:
    No idea if it works, or how, on Windows or other Unixes.  May need
    to revisit in the future.
 ** DONE [#A] Write docs for initial release!				:doc:
-** INPROGRESS [#C] Make compatible with Python 3		  :packaging:
+** DONE [#C] Make compatible with Python 3             :packaging:
    - [X] use print_function
    - [X] do not use dict.iteritems()
    - [X] rename cStringIO to io.StringIO
@@ -123,7 +127,7 @@ It would be nice for reporting to be this easy:
      + [X] reports.py
      + [X] ui.py
      + [X] calculator_helpers.py
-   - [ ] fix uses of zip()
+   - [X] fix uses of zip()
     
 ** DONE [#A] Figure out the best thing to do with user validators     :ui:db:
    useful validators include:
@@ -318,7 +322,7 @@ combined, so that e.g. one could run
 ** TODO [#A] Testing framework					    :testing:
    - need to write tests for bugs, automate testing
    - use virtualenv to test empty configuration
-** WAITING [#B] Distinguish weight vs. possible points?		      :ui:db:
+** HOLD [#B] Distinguish weight vs. possible points?		      :ui:db:
    - currently, assignments.weight field is intended to be interpreted
      as either percentage of final grade (for most grade types) OR
      number of possible points (for 'points' grades)
@@ -366,7 +370,7 @@ combined, so that e.g. one could run
       # which is presently true but maybe doesn't need to remain so
 #+END_SRC
 
-** WAITING [#A] Decide how to handle multiple grades for a single assignment :ui:db:
+** HOLD [#A] Decide how to handle multiple grades for a single assignment :ui:db:
 Problem:
   1) It seems natural to allow multiple grades for the same student
      and assignment
@@ -382,7 +386,11 @@ going to continue assuming this, but code may need to be updated in future.
 Affected functions:
     SimpleUI: edit_grades, export_grades, calculate_grades
        
-** TODO [#C] New UI class PipeUI to handle CLI usage?			 :ui:
+** CANCELED [#C] New UI class PipeUI to handle CLI usage?                :ui:
+   :LOGBOOK:
+   - State "CANCELED"   from "TODO"       [2016-12-18 Sun 14:40] \\
+     I'd rather have an Org UI
+   :END:
    so we could say things like:
    $ grade -c 146 -s spring -y 2013 --import-students < student_list.txt
    $ grade -c 146 -s spring -y 2013 --calculate-grades --export-grades > grades.csv
