@@ -231,7 +231,17 @@ class GradeReport(Report):
                 output.write(u(no_stats_msg.format(**s)))
                 continue
                         
-            output.write(u(stats_template.format(**s)))
+            output.write(u(stats_template.format(
+                assignment_name=s['assignment_name'],
+                grade_type=s['grade_type'],
+                weight=s['weight'],
+                mean=("{: >8.7}".format(s['mean'])
+                      if s['mean'] else ""),
+                min=s['min'],
+                max=s['max'],
+                hist=s['hist'],
+            )))
+            
             if s['missing_students']:
                 students = db.select_students(self.db_connection,
                                               course_id=self.course_id)
