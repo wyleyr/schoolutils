@@ -1201,16 +1201,19 @@ class SimpleUI(BaseUI):
             print(menu_format.format(i, short_descs[i], long_descs[i]))
 
         if default is not None:
-            prompt = "Which action? (default %d): " % actions.index(default)
+            prompt = "Which action? (default %d; Ctrl-C to escape): " % actions.index(default)
         else:
-            prompt = "Which action? (enter a number): "
+            prompt = "Which action? (enter a number; Ctrl-C to escape): "
 
         validator = lambda s: validators.int_in_range(s, 0, len(actions))
-        i = typed_input(prompt, validator,
-                        default=actions.index(default) if default in actions else None)
-        print("") # visually separate menu and selection 
+        try:
+            print("") # visually separate menu and selection 
+            i = typed_input(prompt, validator,
+                            default=actions.index(default) if default in actions else None)
+            return actions[i]()
+        except KeyboardInterrupt:
+            return None
         
-        return actions[i]()
 
     def options_menu(self, query, options, formatter,
                      escape=None, allow_none=False):
