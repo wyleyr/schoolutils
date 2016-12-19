@@ -167,7 +167,7 @@ class GradeReport(Report):
     def as_compact_text(self):
         "Return a compact, tabular representation of this report."
         title_template = "GRADE REPORT: {number}: {name}, {semester} {year}\n"
-        row_template = ("{assignment_name: <25} {weight: <10} {mean: <5.4} {mean_as_letter: <5}"
+        row_template = ("{assignment_name: <25} {weight: <10} {mean: <5} {mean_as_letter: <5}"
                         "{min: <10} {max: <10} {num_missing: <15}\n")
         header = row_template.format(assignment_name="Assignment", weight="Weight",
                                      mean="Mean", mean_as_letter="",
@@ -195,7 +195,10 @@ class GradeReport(Report):
                 row = u(row_template.format(
                         assignment_name=s['assignment_name'],
                         weight=s['weight'],
-                        min=s['min'], max=s['max'], mean=s['mean'],
+                        min=s['min'],
+                        max=s['max'],
+                        mean=("{: >5.4}".format(s['mean'])
+                              if s['mean'] else ""),
                         mean_as_letter=("({0})".format(s['mean_as_letter'])
                                         if s['mean_as_letter'] else ""),
                         num_missing=num_missing))
