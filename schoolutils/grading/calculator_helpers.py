@@ -147,6 +147,13 @@ def weighted_average(values, weights, filter_nan=False):
         values = remove_none_and_nan(values)
     if not values:
         return float('NaN')
+    # sanity check:
+    # (I discovered that some calculations were off because zip()
+    # recycles values when the two lists are not the same length...
+    # user should see an error in this case)
+    if len(values) != len(weights):
+        raise ValueError("values and weights must be the same length.")
+    
     return sum([n[0] * n[1] for n in zip(values, weights)])
 
 def points_to_weights(point_values):
