@@ -384,7 +384,6 @@ class SimpleUI(BaseUI):
                  self.edit_assignments,
                  self.import_students,
                  self.edit_student,
-                 self.enter_grades,
                  self.edit_grades,
                  self.calculate_grades,
                  #self.import_grades,
@@ -625,6 +624,21 @@ class SimpleUI(BaseUI):
 
         self.assignment_id = most_recent['id']
 
+    @require('db_connection', change_database,
+             "A database connection is required to enter grades.")
+    @require('course_id', edit_courses,
+             "A selected course is required to enter grades.")
+    @require('assignment_id', edit_assignments,
+             "A selected assignment is required to enter grades.")
+    def edit_grades(self):
+        """Add or edit grades.
+           Enter grades for the current assignment, or edit existing grades.
+        """
+        self.actions_menu(
+            "What do you want to do?",
+            [self.enter_grades_search,
+             self.enter_grades_loop,
+             self.edit_grades_table])
            
     @require('db_connection', change_database,
              "A database connection is required to enter grades.")
@@ -632,9 +646,9 @@ class SimpleUI(BaseUI):
              "A selected course is required to enter grades.")
     @require('assignment_id', edit_assignments,
              "A selected assignment is required to enter grades.")
-    def enter_grades(self):
-        """Enter grades.
-           Enter grades for the current assignment for individual students.
+    def enter_grades_search(self):
+        """Enter grades by searching.
+           Enter grades for the current assignment by searching for individual students.
         """
         grade_type = db.select_assignments(self.db_connection,
                                            assignment_id=self.assignment_id)[0]['grade_type']
@@ -705,10 +719,52 @@ class SimpleUI(BaseUI):
             # enter_grades_for_student method? (for a single student across all course assignments)
 
     @require('db_connection', change_database,
+             "A database connection is required to enter grades.")
+    @require('course_id', edit_courses,
+             "A selected course is required to enter grades.")
+    @require('assignment_id', edit_assignments,
+             "A selected assignment is required to enter grades.")
+    def enter_grades_loop(self):
+        """Enter grades in a loop.
+           Enter grades for the current assignment by looping over members of the current course.
+           Skips students who already have a grade for the current assignment.
+        """
+        grade_type = db.select_assignments(self.db_connection,
+                                           assignment_id=self.assignment_id)[0]['grade_type']
+        grade_validator = validators.validator_for_grade_type(grade_type)
+
+        print("")
+        print("Use Control-D to skip entering grade for current student.")
+        print("Use Control-C to stop entering grades.")
+        for student in db.select_students(self.db_connection, course_id=self.course_id):
+            existing_grades = db.select_grades(self.db_connection,
+                                               student_id=student['id'],
+                                               course_id=self.course_id,
+                                               assignment_id=self.assignment_id)
+            if existing_grades:
+                continue
+                
+            try: 
+                grade_val = typed_input("Enter grade value for %s: " % self.student_formatter(student),
+                                        grade_validator)
+                db.create_or_update_grade(self.db_connection,
+                                          assignment_id=self.assignment_id,
+                                          student_id=student['id'],
+                                          value=grade_val)
+
+            except EOFError:
+                print("Skipping grade entry for %s." % self.student_formatter(student))
+                continue
+            except KeyboardInterrupt:
+                print("\nSkipping grade entry for remainder of class.\n")
+                break
+
+            
+    @require('db_connection', change_database,
              "A database connection is required to edit grades.")
     @require('course_id', edit_courses,
              "A selected course is required to edit grades.")
-    def edit_grades(self):
+    def edit_grades_table(self):
         """Edit grades.
            Edit a table of grades for the current course.
         """
