@@ -471,7 +471,7 @@ that was most recently due?
    missing a grade).  But it would be better to indicate that no
    information is provided because no grades have been entered for
    that assignment.
-** TODO [#A] Org-based UI
+** TODO [#B] Org-based UI
    - enter grades in Org tables
    - write calculators as Babel code blocks
    - display table with calculated grades, grade reports, etc. to user
@@ -566,6 +566,14 @@ for every student.
 
 ** DONE Support escaping in submenus back to main menu.
 Easiest, and expected, thing here is to trap KeyboardInterrupt.
+
+** TODO [#A] Fix missing values behavior in calculator_helpers          :bug:
+
+Lots of functions call remove_none_and_nan.  But:
+  1) they don't remove the corresponding weights, if they are
+     computing a weighted average.  What to do here?
+  2) they don't remove 'I' grades from letter grades.
+
 
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
