@@ -558,11 +558,14 @@ grade calculation function.  It should be as easy as writing
             }
 #+END_SRC
          
-** TODO Support entering grades for everyone in course
+** DONE Support entering grades for everyone in course
 At the end of the semester, I may need to assign everyone a
 participation grade, etc.  It would be nice to just loop over everyone
 in the course and assignment them a grade, without having to search
 for every student.
+
+** DONE Support escaping in submenus back to main menu.
+Easiest, and expected, thing here is to trap KeyboardInterrupt.
 
 * Bug notes
 ** f890cef9d: grading/db.py: fix bug in select_students giving duplicate rows
