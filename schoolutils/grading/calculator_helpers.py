@@ -244,11 +244,16 @@ def freqs_for_numbers(values, bins, filter_nan=False):
     return freqs
 
 # Munging input data:
-def unpack_entered_grades(rows):
+def unpack_entered_grades(rows, filt=lambda r: True):
     """Extract grade values, weights, types and assignment names from a sequence
        of grade rows produced by, e.g., select_grades_for_course_members.
        Each row must have fields: value, weight, grade_type, assignment_name
        Skips any row where the weight is 'CALC' (indicating a calculated grade).
+
+       filt, if given, should be a filter function that accepts a single row and
+         returns True iff the row's data should be included in the output.
+         e.g., lambda row: row['assignment_name'].startwsith('Essay')
+         Default uses every row.
        
        Returns four co-indexed lists, in the following order:
          values: grade values
@@ -260,7 +265,7 @@ def unpack_entered_grades(rows):
     weights = []
     types = []
     assignment_names = []
-    for r in rows:
+    for r in filter(filt, rows):
         values.append(r['value'])
         weights.append(r['weight'])
         types.append(r['grade_type'])
